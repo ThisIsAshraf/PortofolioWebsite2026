@@ -1,0 +1,100 @@
+SET FOREIGN_KEY_CHECKS = 0;
+
+-- 1. Wipe test contact inquiries
+DELETE FROM contact_messages;
+ALTER TABLE contact_messages AUTO_INCREMENT = 1;
+
+-- 2. Wipe child tables first
+DELETE FROM experience_responsibilities;
+ALTER TABLE experience_responsibilities AUTO_INCREMENT = 1;
+
+DELETE FROM project_tags;
+ALTER TABLE project_tags AUTO_INCREMENT = 1;
+
+DELETE FROM skills;
+ALTER TABLE skills AUTO_INCREMENT = 1;
+
+-- 3. Wipe parent tables
+DELETE FROM experience;
+ALTER TABLE experience AUTO_INCREMENT = 1;
+
+DELETE FROM projects;
+ALTER TABLE projects AUTO_INCREMENT = 1;
+
+DELETE FROM skill_groups;
+ALTER TABLE skill_groups AUTO_INCREMENT = 1;
+
+DELETE FROM education;
+ALTER TABLE education AUTO_INCREMENT = 1;
+
+SET FOREIGN_KEY_CHECKS = 1;
+
+-- -------------------------------------------------------------
+-- Seed Initial Clean Baseline Data
+-- -------------------------------------------------------------
+
+-- Seed Skill Groups
+INSERT INTO skill_groups (id, name, sort_order) VALUES
+(1, 'Support', 1),
+(2, 'Administration', 2),
+(3, 'Operations', 3),
+(4, 'Networking', 4),
+(5, 'Learning', 5);
+
+-- Seed Skills
+INSERT INTO skills (id, group_id, name, level, sort_order, is_visible) VALUES
+(1, 1, 'L1/L2 Technical Support', 'Core', 1, 1),
+(2, 1, 'Service Desk & Ticketing', 'Core', 2, 1),
+(3, 1, 'Hardware & Software Troubleshooting', 'Core', 3, 1),
+(4, 2, 'Google Workspace Administration', 'Core', 4, 1),
+(5, 2, 'Mailbox & License Management', 'Core', 5, 1),
+(6, 3, 'IT Asset Management', 'Core', 6, 1),
+(7, 3, 'IT Procurement & Vendor Coordination', 'Core', 7, 1),
+(8, 4, 'TCP/IP, DNS & LAN/WAN', 'Working knowledge', 8, 1),
+(9, 5, 'Microsoft 365 & Entra ID', 'Currently developing', 9, 1),
+(10, 5, 'Microsoft Azure (AZ-104 path)', 'Currently developing', 10, 1);
+
+-- Seed Experience
+INSERT INTO experience (id, role, company, period, location, sort_order, is_visible) VALUES
+(1, 'Senior Desktop Support Engineer', 'Noor Staffing Group', 'Mar 2026 – Present', 'Bangladesh', 1, 1),
+(2, 'Desktop Support Specialist', 'Noor Staffing Group', 'Oct 2024 – Feb 2026', 'Bangladesh', 2, 1),
+(3, 'Technical Support Advisor', 'Amber Software Solutions', 'Feb 2023 – Sep 2024', 'Remote / UK customers', 3, 1),
+(4, 'IT Support Engineer', 'Flyte Solutions Ltd', 'Nov 2021 – Jan 2023', 'Bangladesh', 4, 1),
+(5, 'Junior Back-End Developer Intern', 'JomRun Sdn Bhd', 'Oct 2021 – Dec 2021', 'Malaysia', 5, 1);
+
+-- Seed Experience Responsibilities
+INSERT INTO experience_responsibilities (experience_id, responsibility, sort_order) VALUES
+(1, 'Provide L1/L2 support for end-user devices, software, peripherals, connectivity, and business applications.', 1),
+(1, 'Manage incidents and service requests through Zendesk.', 2),
+(1, 'Administer Google Workspace accounts, groups, permissions, mailboxes, and license allocation.', 3),
+(1, 'Manage RingCentral users and support LinkedIn and Indeed user administration.', 4),
+(1, 'Coordinate onboarding/offboarding, IT assets, purchasing, quotations, and vendor follow-up.', 5),
+(1, 'Supported the successful Bangladesh office network migration from Cat5 to Cat6.', 6),
+(2, 'Delivered desktop and end-user support for hardware, software, printers, applications, and connectivity.', 1),
+(2, 'Managed incidents and service requests using Jira Service Management.', 2),
+(2, 'Supported Google Workspace administration, onboarding, account setup, and access management.', 3),
+(2, 'Maintained IT asset records and supported workstation deployment.', 4),
+(3, 'Supported customers by phone, email, and remote sessions.', 1),
+(3, 'Troubleshot technical, application, hardware, software, and connectivity issues.', 2),
+(3, 'Assisted with Outlook configuration and email maintenance.', 3),
+(3, 'Contributed web portal updates using HTML, CSS, JavaScript, and core PHP.', 4),
+(4, 'Supported desktops, laptops, operating systems, printers, peripherals, email, and network connectivity.', 1),
+(4, 'Assisted with user accounts, shared resources, workstation deployment, upgrades, and maintenance.', 2),
+(4, 'Documented common support procedures and helped users with workplace technology.', 3),
+(5, 'Completed a short back-end development internship and gained exposure to software development workflows.', 1);
+
+-- Seed Projects
+INSERT INTO projects (id, title, project_type, description, sort_order, is_visible) VALUES
+(1, 'Office Network Migration', 'Infrastructure · Networking', 'Supported the Bangladesh office migration from Cat5 to Cat6 cabling, coordinating implementation activities and helping deliver a successful upgrade.', 1, 1),
+(2, 'Google Workspace Administration', 'SaaS · IT Operations', 'Manage mailbox and account requirements, groups, permissions, and license allocation with attention to access needs and cost-conscious administration.', 2, 1),
+(3, 'Service Desk & Asset Operations', 'Support · Operations', 'Support ticket workflows, onboarding/offboarding, equipment allocation, inventory records, purchasing, and vendor follow-up.', 3, 1);
+
+-- Seed Project Tags
+INSERT INTO project_tags (project_id, tag_name) VALUES
+(1, 'Cat6 Cabling'), (1, 'Coordination'), (1, 'Office Infrastructure'),
+(2, 'Google Workspace'), (2, 'Licensing'), (2, 'Access Management'),
+(3, 'Zendesk'), (3, 'IT Assets'), (3, 'Procurement');
+
+-- Seed Education
+INSERT INTO education (id, degree, institution, period, detail, sort_order, is_visible) VALUES
+(1, 'Bachelor of Science in Information Technology', 'Limkokwing University of Creative Technology', '2019 – 2021', 'Cyberjaya, Selangor, Malaysia · CGPA: 3.91 / 4.00', 1, 1);

@@ -1,75 +1,515 @@
 <?php
+
+declare(strict_types=1);
+
 require_once dirname(__DIR__) . '/config.php';
 require_admin();
-$pdo=db(); $configs=content_config();
-$page=(string)($_GET['page']??'dashboard');
-if ($_SERVER['REQUEST_METHOD']==='POST') {
-    verify_csrf(); $action=(string)($_POST['action']??'');
-    if ($action==='logout') { $_SESSION=[]; if (ini_get('session.use_cookies')) { $p=session_get_cookie_params(); setcookie(session_name(),'',time()-42000,$p['path'],$p['domain'],$p['secure'],$p['httponly']); } session_destroy(); redirect('admin/login.php'); }
-    if ($action==='save_profile') {
-        $keys=['name','role','location','headline','intro','linkedin','email','phone']; $values=[]; foreach($keys as $key) $values[$key]=trim((string)($_POST[$key]??''));
-        if ($values['name']===''||$values['role']==='') { flash('error','Name and professional title are required.'); redirect('admin/index.php?page=profile'); }
-        if ($values['email']!==''&&!filter_var($values['email'],FILTER_VALIDATE_EMAIL)) { flash('error','Please enter a valid email address.'); redirect('admin/index.php?page=profile'); }
-        foreach($values as $key=>$value) set_setting($key,$value);
+
+$pdo = db();
+$page = (string)($_GET['page'] ?? 'dashboard');
+
+// -----------------------------------------------------------------------------
+// 1. Session & Auth Handlers
+// -----------------------------------------------------------------------------
+if (isset($_GET['action']) && $_GET['action'] === 'logout') {
+    $_SESSION = [];
+    if (ini_get('session.use_cookies')) {
+        $p = session_get_cookie_params();
+        setcookie(session_name(), '', time() - 42000, $p['path'], $p['domain'], $p['secure'], $p['httponly']);
+    }
+    session_destroy();
+    redirect('admin/login');
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    verify_csrf();
+    $action = (string)($_POST['action'] ?? '');
+
+    if ($action === 'logout') {
+        $_SESSION = [];
+        if (ini_get('session.use_cookies')) {
+            $p = session_get_cookie_params();
+            setcookie(session_name(), '', time() - 42000, $p['path'], $p['domain'], $p['secure'], $p['httponly']);
+        }
+        session_destroy();
+        redirect('admin/login');
+    }
+
+    // -------------------------------------------------------------------------
+    // Profile & Photo Update
+    // -------------------------------------------------------------------------
+    if ($action === 'save_profile') {
+        $keys = ['name', 'role', 'location', 'headline', 'intro', 'linkedin', 'email', 'phone'];
+        $values = [];
+        foreach ($keys as $key) {
+            $values[$key] = trim((string)($_POST[$key] ?? ''));
+        }
+
+        if ($values['name'] === '' || $values['role'] === '') {
+            flash('error', 'Name and professional title are required.');
+            redirect('admin/profile');
+        }
+
+        if ($values['email'] !== '' && !filter_var($values['email'], FILTER_VALIDATE_EMAIL)) {
+            flash('error', 'Please enter a valid email address.');
+            redirect('admin/profile');
+        }
+
+        foreach ($values as $key => $value) {
+            set_setting($key, $value);
+        }
+
         if (!empty($_FILES['photo']['name'])) {
-            $file=$_FILES['photo']; $max=5*1024*1024; $allowed=['image/jpeg'=>'jpg','image/png'=>'png','image/webp'=>'webp'];
-            $mime=''; if (is_uploaded_file($file['tmp_name']??'')) { $finfo=new finfo(FILEINFO_MIME_TYPE); $mime=$finfo->file($file['tmp_name']); }
-            if (($file['error']??UPLOAD_ERR_NO_FILE)!==UPLOAD_ERR_OK || ($file['size']??0)>$max || !isset($allowed[$mime])) { flash('error','Upload a JPG, PNG, or WEBP photo under 5 MB.'); redirect('admin/index.php?page=profile'); }
-            $filename='profile_'.bin2hex(random_bytes(8)).'.'.$allowed[$mime];
-            if (move_uploaded_file($file['tmp_name'],dirname(__DIR__).'/uploads/'.$filename)) set_setting('photo',$filename); else { flash('error','Photo upload failed. Check folder permissions.'); redirect('admin/index.php?page=profile'); }
+            $file = $_FILES['photo'];
+            $max = 5 * 1024 * 1024;
+            $allowed = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp'];
+            $mime = '';
+
+            if (is_uploaded_file($file['tmp_name'] ?? '')) {
+                $finfo = new finfo(FILEINFO_MIME_TYPE);
+                $mime = $finfo->file($file['tmp_name']);
+            }
+
+            if (($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK || ($file['size'] ?? 0) > $max || !isset($allowed[$mime])) {
+                flash('error', 'Upload a valid JPG, PNG, or WEBP image under 5 MB.');
+                redirect('admin/profile');
+            }
+
+            $filename = 'profile_' . bin2hex(random_bytes(8)) . '.' . $allowed[$mime];
+            if (move_uploaded_file($file['tmp_name'], dirname(__DIR__) . '/uploads/' . $filename)) {
+                set_setting('photo', $filename);
+            } else {
+                flash('error', 'Photo upload failed. Check upload directory permissions.');
+                redirect('admin/profile');
+            }
         }
-        flash('success','Profile updated.'); redirect('admin/index.php?page=profile');
+
+        flash('success', 'Profile updated successfully.');
+        redirect('admin/profile');
     }
-    if ($action==='save_content') {
-        $type=(string)($_POST['type']??''); if (!isset($configs[$type])) { http_response_code(400); exit('Invalid content type.'); }
-        $cfg=$configs[$type]; $id=(int)($_POST['id']??0); $data=[];
-        foreach($cfg['fields'] as $field=>$meta) {
-            [$label,$kind,$required]=$meta; $value=trim((string)($_POST[$field]??''));
-            if ($required && $value==='') { flash('error',$label.' is required.'); redirect('admin/index.php?page=content&type='.$type.($id?'&edit='.$id:'&new=1')); }
-            if ($field==='sort_order') $value=(string)(int)$value;
-            if ($field==='description' && $type==='experience') $value=json_encode(array_values(array_filter(array_map('trim', preg_split('/\R/u', $value)))), JSON_UNESCAPED_UNICODE);
-            if ($field==='tags' && $type==='projects') $value=json_encode(array_values(array_filter(array_map('trim', explode(',', $value)))), JSON_UNESCAPED_UNICODE);
-            $data[$field]=$value;
+
+    // -------------------------------------------------------------------------
+    // SMTP Configuration & Test Dispatch
+    // -------------------------------------------------------------------------
+    if ($action === 'save_smtp') {
+        save_smtp_config([
+            'host'       => $_POST['host'] ?? '',
+            'port'       => (int)($_POST['port'] ?? 587),
+            'encryption' => $_POST['encryption'] ?? 'tls',
+            'username'   => $_POST['username'] ?? '',
+            'password'   => $_POST['password'] ?? '',
+            'from_email' => $_POST['from_email'] ?? '',
+            'from_name'  => $_POST['from_name'] ?? 'Portfolio Bot',
+            'is_active'  => isset($_POST['is_active']) ? 1 : 0
+        ]);
+        flash('success', 'SMTP settings updated successfully.');
+        redirect('admin/smtp');
+    }
+
+    if ($action === 'test_email') {
+        $to = trim((string)($_POST['test_recipient'] ?? ''));
+        if (!filter_var($to, FILTER_VALIDATE_EMAIL)) {
+            flash('error', 'Please enter a valid recipient email address.');
+            redirect('admin/smtp');
         }
-        if ($id>0) { $sets=implode(',',array_map(fn($c)=>"`$c`=?",array_keys($data))); $stmt=$pdo->prepare("UPDATE `{$cfg['table']}` SET $sets WHERE id=?"); $stmt->execute([...array_values($data),$id]); flash('success',$cfg['title'].' item updated.'); }
-        else { $cols=array_map(fn($c)=>"`$c`",array_keys($data)); $marks=implode(',',array_fill(0,count($data),'?')); $stmt=$pdo->prepare("INSERT INTO `{$cfg['table']}` (".implode(',',$cols).") VALUES ($marks)"); $stmt->execute(array_values($data)); flash('success',$cfg['title'].' item created.'); }
-        redirect('admin/index.php?page=content&type='.$type);
+
+        $smtp = get_smtp_config();
+        try {
+            $mail = new \PHPMailer\PHPMailer\PHPMailer(true);
+            $mail->isSMTP();
+            $mail->Host       = $smtp['host'];
+            $mail->SMTPAuth   = true;
+            $mail->Username   = $smtp['username'];
+            $mail->Password   = $smtp['password'];
+            $mail->SMTPSecure = ($smtp['encryption'] === 'ssl')
+                ? \PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_SMTPS
+                : \PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_STARTTLS;
+            $mail->Port       = (int)$smtp['port'];
+
+            $mail->setFrom($smtp['from_email'] ?: $smtp['username'], (string)$smtp['from_name']);
+            $mail->addAddress($to);
+            $mail->Subject = 'SMTP Test Verification — Portfolio CMS';
+            $mail->Body    = "Success! Your SMTP mail configuration is functional and ready to deliver contact form notifications.";
+
+            $mail->send();
+            flash('success', 'Test email dispatched successfully to ' . $to);
+        } catch (\Throwable $e) {
+            flash('error', 'SMTP Connection Test Failed: ' . $e->getMessage());
+        }
+        redirect('admin/smtp');
     }
-    if ($action==='delete_content') { $type=(string)($_POST['type']??''); $id=(int)($_POST['id']??0); if(isset($configs[$type])) { $stmt=$pdo->prepare('DELETE FROM `'.$configs[$type]['table'].'` WHERE id=?'); $stmt->execute([$id]); flash('success','Item deleted.'); } redirect('admin/index.php?page=content&type='.$type); }
-    if ($action==='visibility') { $type=(string)($_POST['type']??''); $id=(int)($_POST['id']??0); if(isset($configs[$type])) { $table=$configs[$type]['table']; $stmt=$pdo->prepare("UPDATE `$table` SET is_visible=1-is_visible WHERE id=?"); $stmt->execute([$id]); flash('success','Visibility updated.'); } redirect('admin/index.php?page=content&type='.$type); }
-    if ($action==='message_status') { $id=(int)($_POST['id']??0); $status=(string)($_POST['status']??'new'); if(!in_array($status,['new','read','replied','archived'],true)){http_response_code(400);exit('Invalid status.');} $stmt=$pdo->prepare('UPDATE contact_messages SET status=? WHERE id=?'); $stmt->execute([$status,$id]); flash('success','Message status updated.'); redirect('admin/index.php?page=messages&view='.$id); }
-    if ($action==='delete_message') { $stmt=$pdo->prepare('DELETE FROM contact_messages WHERE id=?'); $stmt->execute([(int)($_POST['id']??0)]); flash('success','Message deleted.'); redirect('admin/index.php?page=messages'); }
+
+    // -------------------------------------------------------------------------
+    // Normalized Content CRUD Handlers
+    // -------------------------------------------------------------------------
+    if ($action === 'save_content') {
+        $type = (string)($_POST['type'] ?? '');
+        $id = (int)($_POST['id'] ?? 0);
+
+        if ($type === 'skills') {
+            $name = trim((string)($_POST['name'] ?? ''));
+            $groupName = trim((string)($_POST['group_name'] ?? 'Support'));
+            $level = trim((string)($_POST['level'] ?? 'Core'));
+            $sort = (int)($_POST['sort_order'] ?? 0);
+
+            if ($name === '') {
+                flash('error', 'Skill name is required.');
+                redirect("admin/content/skills" . ($id ? "?edit={$id}" : '?new=1'));
+            }
+
+            $gStmt = $pdo->prepare('SELECT id FROM skill_groups WHERE name = ? LIMIT 1');
+            $gStmt->execute([$groupName]);
+            $groupId = $gStmt->fetchColumn();
+
+            if (!$groupId) {
+                $gIns = $pdo->prepare('INSERT INTO skill_groups (name, sort_order) VALUES (?, 0)');
+                $gIns->execute([$groupName]);
+                $groupId = (int)$pdo->lastInsertId();
+            }
+
+            if ($id > 0) {
+                $uStmt = $pdo->prepare('UPDATE skills SET group_id = ?, name = ?, level = ?, sort_order = ? WHERE id = ?');
+                $uStmt->execute([$groupId, $name, $level, $sort, $id]);
+                flash('success', 'Skill updated.');
+            } else {
+                $iStmt = $pdo->prepare('INSERT INTO skills (group_id, name, level, sort_order) VALUES (?, ?, ?, ?)');
+                $iStmt->execute([$groupId, $name, $level, $sort]);
+                flash('success', 'Skill created.');
+            }
+            redirect('admin/content/skills');
+        }
+
+        if ($type === 'experience') {
+            $role = trim((string)($_POST['role'] ?? ''));
+            $company = trim((string)($_POST['company'] ?? ''));
+            $period = trim((string)($_POST['period'] ?? ''));
+            $location = trim((string)($_POST['location'] ?? ''));
+            $sort = (int)($_POST['sort_order'] ?? 0);
+            $rawBullets = trim((string)($_POST['description'] ?? ''));
+
+            if ($role === '' || $company === '' || $period === '') {
+                flash('error', 'Job title, company, and period are required.');
+                redirect("admin/content/experience" . ($id ? "?edit={$id}" : '?new=1'));
+            }
+
+            $pdo->beginTransaction();
+            if ($id > 0) {
+                $uStmt = $pdo->prepare('UPDATE experience SET role = ?, company = ?, period = ?, location = ?, sort_order = ? WHERE id = ?');
+                $uStmt->execute([$role, $company, $period, $location, $sort, $id]);
+                $pdo->prepare('DELETE FROM experience_responsibilities WHERE experience_id = ?')->execute([$id]);
+                $expId = $id;
+                flash('success', 'Work experience updated.');
+            } else {
+                $iStmt = $pdo->prepare('INSERT INTO experience (role, company, period, location, sort_order) VALUES (?, ?, ?, ?, ?)');
+                $iStmt->execute([$role, $company, $period, $location, $sort]);
+                $expId = (int)$pdo->lastInsertId();
+                flash('success', 'Work experience created.');
+            }
+
+            $bullets = array_values(array_filter(array_map('trim', preg_split('/\R/u', $rawBullets))));
+            $respStmt = $pdo->prepare('INSERT INTO experience_responsibilities (experience_id, responsibility, sort_order) VALUES (?, ?, ?)');
+            foreach ($bullets as $idx => $bullet) {
+                $respStmt->execute([$expId, $bullet, $idx + 1]);
+            }
+            $pdo->commit();
+            redirect('admin/content/experience');
+        }
+
+        if ($type === 'projects') {
+            $title = trim((string)($_POST['title'] ?? ''));
+            $projectType = trim((string)($_POST['project_type'] ?? ''));
+            $desc = trim((string)($_POST['description'] ?? ''));
+            $sort = (int)($_POST['sort_order'] ?? 0);
+            $rawTags = trim((string)($_POST['tags'] ?? ''));
+
+            if ($title === '' || $projectType === '' || $desc === '') {
+                flash('error', 'Title, category, and description are required.');
+                redirect("admin/content/projects" . ($id ? "?edit={$id}" : '?new=1'));
+            }
+
+            $pdo->beginTransaction();
+            if ($id > 0) {
+                $uStmt = $pdo->prepare('UPDATE projects SET title = ?, project_type = ?, description = ?, sort_order = ? WHERE id = ?');
+                $uStmt->execute([$title, $projectType, $desc, $sort, $id]);
+                $pdo->prepare('DELETE FROM project_tags WHERE project_id = ?')->execute([$id]);
+                $projId = $id;
+                flash('success', 'Project updated.');
+            } else {
+                $iStmt = $pdo->prepare('INSERT INTO projects (title, project_type, description, sort_order) VALUES (?, ?, ?, ?)');
+                $iStmt->execute([$title, $projectType, $desc, $sort]);
+                $projId = (int)$pdo->lastInsertId();
+                flash('success', 'Project created.');
+            }
+
+            $tags = array_values(array_filter(array_map('trim', explode(',', $rawTags))));
+            $tagStmt = $pdo->prepare('INSERT INTO project_tags (project_id, tag_name) VALUES (?, ?)');
+            foreach ($tags as $tag) {
+                $tagStmt->execute([$projId, $tag]);
+            }
+            $pdo->commit();
+            redirect('admin/content/projects');
+        }
+
+        if ($type === 'education') {
+            $degree = trim((string)($_POST['degree'] ?? ''));
+            $institution = trim((string)($_POST['institution'] ?? ''));
+            $period = trim((string)($_POST['period'] ?? ''));
+            $detail = trim((string)($_POST['detail'] ?? ''));
+            $sort = (int)($_POST['sort_order'] ?? 0);
+
+            if ($degree === '' || $institution === '' || $period === '') {
+                flash('error', 'Degree, institution, and period are required.');
+                redirect("admin/content/education" . ($id ? "?edit={$id}" : '?new=1'));
+            }
+
+            if ($id > 0) {
+                $uStmt = $pdo->prepare('UPDATE education SET degree = ?, institution = ?, period = ?, detail = ?, sort_order = ? WHERE id = ?');
+                $uStmt->execute([$degree, $institution, $period, $detail, $sort, $id]);
+                flash('success', 'Education record updated.');
+            } else {
+                $iStmt = $pdo->prepare('INSERT INTO education (degree, institution, period, detail, sort_order) VALUES (?, ?, ?, ?, ?)');
+                $iStmt->execute([$degree, $institution, $period, $detail, $sort]);
+                flash('success', 'Education record created.');
+            }
+            redirect('admin/content/education');
+        }
+    }
+
+    if ($action === 'delete_content') {
+        $type = (string)($_POST['type'] ?? '');
+        $id = (int)($_POST['id'] ?? 0);
+        $allowed = ['skills' => 'skills', 'experience' => 'experience', 'projects' => 'projects', 'education' => 'education'];
+        if (isset($allowed[$type])) {
+            $stmt = $pdo->prepare("DELETE FROM `{$allowed[$type]}` WHERE id = ?");
+            $stmt->execute([$id]);
+            flash('success', 'Item deleted.');
+        }
+        redirect("admin/content/{$type}");
+    }
+
+    if ($action === 'visibility') {
+        $type = (string)($_POST['type'] ?? '');
+        $id = (int)($_POST['id'] ?? 0);
+        $allowed = ['skills' => 'skills', 'experience' => 'experience', 'projects' => 'projects', 'education' => 'education'];
+        if (isset($allowed[$type])) {
+            $table = $allowed[$type];
+            $stmt = $pdo->prepare("UPDATE `{$table}` SET is_visible = 1 - is_visible WHERE id = ?");
+            $stmt->execute([$id]);
+            flash('success', 'Visibility status updated.');
+        }
+        redirect("admin/content/{$type}");
+    }
+
+    if ($action === 'message_status') {
+        $id = (int)($_POST['id'] ?? 0);
+        $status = (string)($_POST['status'] ?? 'new');
+        if (in_array($status, ['new', 'read', 'replied', 'archived'], true)) {
+            $stmt = $pdo->prepare('UPDATE contact_messages SET status = ? WHERE id = ?');
+            $stmt->execute([$status, $id]);
+            flash('success', 'Message status updated.');
+        }
+        redirect("admin/messages?view={$id}");
+    }
+
+    if ($action === 'delete_message') {
+        $stmt = $pdo->prepare('DELETE FROM contact_messages WHERE id = ?');
+        $stmt->execute([(int)($_POST['id'] ?? 0)]);
+        flash('success', 'Message deleted.');
+        redirect('admin/messages');
+    }
 }
-$flashes=take_flashes();
-function admin_header(string $title,string $page,array $flashes): void { ?>
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title><?=e($title)?> · Shihab Portfolio</title><link rel="stylesheet" href="../assets/css/style.css"><link rel="stylesheet" href="../assets/css/admin.css"></head><body class="admin-body"><div class="admin-shell"><aside class="admin-sidebar"><a class="brand" href="index.php"><span class="brand-mark">S.</span><span>SHIHAB<span class="brand-dot">/</span></span></a><p class="sidebar-label">WORKSPACE</p><nav class="admin-nav"><a class="<?= $page==='dashboard'?'active':''?>" href="index.php">▦ &nbsp; Dashboard</a><a class="<?= $page==='profile'?'active':''?>" href="index.php?page=profile">◉ &nbsp; Profile & Photo</a><a href="index.php?page=content&type=skills">✳ &nbsp; Skills</a><a href="index.php?page=content&type=experience">▤ &nbsp; Work Experience</a><a href="index.php?page=content&type=projects">◇ &nbsp; Projects</a><a href="index.php?page=content&type=education">▣ &nbsp; Education</a><a class="<?= $page==='messages'?'active':''?>" href="index.php?page=messages">✉ &nbsp; Messages</a></nav><div class="sidebar-bottom"><a href="../index.php" target="_blank" rel="noopener">↗ View public website</a><form method="post"><input type="hidden" name="csrf_token" value="<?=e(csrf_token())?>"><input type="hidden" name="action" value="logout"><button type="submit">↪ Sign out</button></form></div></aside><main class="admin-main"><header class="admin-topbar"><div><span class="admin-top-kicker">PORTFOLIO MANAGEMENT</span><h1><?=e($title)?></h1></div><span class="admin-user">● &nbsp; <?=e($_SESSION['admin_username']??'Admin')?></span></header><section class="admin-content"><?php foreach($flashes as $f): ?><div class="flash flash-<?=e($f['type'])?>" role="status"><?=e($f['message'])?></div><?php endforeach; ?>
-<?php }
-function admin_footer(): void { ?></section><footer class="admin-footer">Portfolio CMS · Keep your profile current and your credentials private.</footer></main></div></body></html><?php }
-if ($page==='profile') {
-    $profile=[]; foreach(['name','role','location','headline','intro','linkedin','email','phone','photo'] as $k)$profile[$k]=setting($k);
-    admin_header('Profile & Photo',$page,$flashes); ?>
-    <div class="admin-panel"><h2>Public profile</h2><p class="panel-hint">Changes appear on the public website after saving.</p><form method="post" enctype="multipart/form-data" class="admin-form"><input type="hidden" name="csrf_token" value="<?=e(csrf_token())?>"><input type="hidden" name="action" value="save_profile"><div class="form-grid"><label>Name *<input name="name" required value="<?=e($profile['name'])?>"></label><label>Professional title *<input name="role" required value="<?=e($profile['role'])?>"></label><label>Location<input name="location" value="<?=e($profile['location'])?>"></label><label>Email address<input type="email" name="email" value="<?=e($profile['email'])?>" placeholder="you@example.com"></label><label>Phone number<input type="tel" name="phone" value="<?=e($profile['phone'])?>" placeholder="+880 1XXXXXXXXX" autocomplete="tel"></label><label class="wide">LinkedIn URL<input type="url" name="linkedin" value="<?=e($profile['linkedin'])?>"></label><label class="wide">Headline<input name="headline" value="<?=e($profile['headline'])?>"></label><label class="wide">Introduction<textarea name="intro" rows="4"><?=e($profile['intro'])?></textarea></label><label class="wide">Profile photo (JPG, PNG, WEBP; max 5 MB)<input type="file" name="photo" accept="image/jpeg,image/png,image/webp"></label></div><?php if($profile['photo'] && is_file(dirname(__DIR__).'/uploads/'.$profile['photo'])): ?><p>Current photo:</p><img class="admin-photo-preview" src="../uploads/<?=e($profile['photo'])?>" alt="Current profile photo"><?php endif; ?><button class="button button-primary" type="submit">Save profile ↗</button></form></div>
-    <?php admin_footer(); exit;
+
+$flashes = take_flashes();
+
+// -----------------------------------------------------------------------------
+// 2. View Router (Delegating to admin/views/)
+// -----------------------------------------------------------------------------
+
+// SMTP Configuration View
+if ($page === 'smtp') {
+    $title = 'SMTP & Mail Settings';
+    $smtp = get_smtp_config();
+    require __DIR__ . '/views/header.php';
+    require __DIR__ . '/views/smtp.php';
+    require __DIR__ . '/views/footer.php';
+    exit;
 }
-if ($page==='content') {
-    $type=(string)($_GET['type']??'skills'); if(!isset($configs[$type])) { http_response_code(404); exit('Content type not found.'); } $cfg=$configs[$type];
-    if(isset($_GET['new'])||isset($_GET['edit'])) { $id=(int)($_GET['edit']??0); $item=[]; if($id){$stmt=$pdo->prepare('SELECT * FROM `'.$cfg['table'].'` WHERE id=?');$stmt->execute([$id]);$item=$stmt->fetch()?:[];if(!$item){http_response_code(404);exit('Item not found.');}} admin_header(($id?'Edit ':'Add ').$cfg['title'],$page,$flashes); ?>
-    <div class="admin-panel"><a class="back-link" href="index.php?page=content&type=<?=e($type)?>">← Back to <?=e($cfg['title'])?></a><h2><?=$id?'Edit item':'Add item'?></h2><form method="post" class="admin-form"><input type="hidden" name="csrf_token" value="<?=e(csrf_token())?>"><input type="hidden" name="action" value="save_content"><input type="hidden" name="type" value="<?=e($type)?>"><input type="hidden" name="id" value="<?=$id?>"><div class="form-grid"><?php foreach($cfg['fields'] as $field=>$meta): [$label,$kind,$required]=$meta; $value=$item[$field]??($field==='sort_order'?'0':''); if($type==='experience'&&$field==='description'&&$value!=='')$value=implode("\n",parse_json_list($value));if($type==='projects'&&$field==='tags'&&$value!=='')$value=implode(', ',parse_json_list($value)); ?><label class="<?=($kind==='textarea'?'wide':'')?>"><?=e($label)?><?=$required?' *':''?><?php if($kind==='textarea'): ?><textarea name="<?=e($field)?>" rows="5" <?=$required?'required':''?>><?=e((string)$value)?></textarea><?php else: ?><input type="<?=e($kind)?>" name="<?=e($field)?>" value="<?=e((string)$value)?>" <?=$required?'required':''?>><?php endif; ?></label><?php endforeach; ?></div><button class="button button-primary" type="submit">Save changes ↗</button></form></div>
-    <?php admin_footer(); exit; }
-    $stmt=$pdo->query('SELECT * FROM `'.$cfg['table'].'` ORDER BY sort_order,id'); $rows=$stmt->fetchAll(); admin_header($cfg['title'],$page,$flashes); ?>
-    <div class="admin-toolbar"><p class="panel-hint">Manage the items shown on your public portfolio. Hidden items remain in the database.</p><a class="button button-primary" href="index.php?page=content&type=<?=e($type)?>&new=1">+ Add item</a></div><div class="admin-panel table-panel"><div class="table-scroll"><table class="admin-table"><thead><tr><?php foreach($cfg['columns'] as $col): ?><th><?=e(ucwords(str_replace('_',' ',$col)))?></th><?php endforeach; ?><th>Visibility</th><th>Actions</th></tr></thead><tbody><?php foreach($rows as $row): ?><tr><?php foreach($cfg['columns'] as $col): ?><td><?php $v=(string)($row[$col]??''); if(strlen($v)>125)$v=substr($v,0,122).'…'; echo e($v); ?></td><?php endforeach; ?><td><span class="status-pill <?=$row['is_visible']?'status-live':'status-hidden'?>"><?=$row['is_visible']?'Visible':'Hidden'?></span></td><td><div class="action-row"><a class="small-action" href="index.php?page=content&type=<?=e($type)?>&edit=<?=$row['id']?>">Edit</a><form method="post"><input type="hidden" name="csrf_token" value="<?=e(csrf_token())?>"><input type="hidden" name="action" value="visibility"><input type="hidden" name="type" value="<?=e($type)?>"><input type="hidden" name="id" value="<?=$row['id']?>"><button class="small-action" type="submit"><?=$row['is_visible']?'Hide':'Show'?></button></form><form method="post" onsubmit="return confirm('Delete this item permanently?')"><input type="hidden" name="csrf_token" value="<?=e(csrf_token())?>"><input type="hidden" name="action" value="delete_content"><input type="hidden" name="type" value="<?=e($type)?>"><input type="hidden" name="id" value="<?=$row['id']?>"><button class="small-action danger" type="submit">Delete</button></form></div></td></tr><?php endforeach; if(!$rows): ?><tr><td colspan="<?=count($cfg['columns'])+2?>">No items yet. Use “Add item” to create one.</td></tr><?php endif; ?></tbody></table></div></div>
-    <?php admin_footer(); exit;
+
+// Profile View
+if ($page === 'profile') {
+    $title = 'Profile & Photo';
+    $profile = [];
+    foreach (['name', 'role', 'location', 'headline', 'intro', 'linkedin', 'email', 'phone', 'photo'] as $k) {
+        $profile[$k] = setting($k);
+    }
+    require __DIR__ . '/views/header.php';
+    require __DIR__ . '/views/profile.php';
+    require __DIR__ . '/views/footer.php';
+    exit;
 }
-if ($page==='messages') {
-    if(isset($_GET['view'])) { $id=(int)$_GET['view']; $stmt=$pdo->prepare('SELECT * FROM contact_messages WHERE id=?');$stmt->execute([$id]);$message=$stmt->fetch();if(!$message){http_response_code(404);exit('Message not found.');} if($message['status']==='new'){$pdo->prepare("UPDATE contact_messages SET status='read' WHERE id=?")->execute([$id]);$message['status']='read';} admin_header('Contact message',$page,$flashes); ?>
-    <div class="admin-panel"><a class="back-link" href="index.php?page=messages">← Back to inbox</a><div class="message-heading"><div><h2><?=e($message['subject']?:'No subject')?></h2><p class="panel-hint">From <?=e($message['name'])?> · <?=e($message['email'])?></p><p class="panel-hint"><?=e($message['created_at'])?></p></div><span class="status-pill status-<?=e($message['status'])?>"><?=e(ucfirst($message['status']))?></span></div><div class="message-body"><?=nl2br(e($message['message']))?></div><div class="message-actions"><a class="button button-primary" href="mailto:<?=e($message['email'])?>?subject=<?=rawurlencode('Re: '.($message['subject']?:'Your message'))?>">Reply by email ↗</a><form method="post" class="inline-form"><input type="hidden" name="csrf_token" value="<?=e(csrf_token())?>"><input type="hidden" name="action" value="message_status"><input type="hidden" name="id" value="<?=$id?>"><select name="status"><?php foreach(['new','read','replied','archived'] as $s): ?><option value="<?=$s?>" <?=$message['status']===$s?'selected':''?>><?=ucfirst($s)?></option><?php endforeach; ?></select><button class="small-action" type="submit">Update status</button></form><form method="post" onsubmit="return confirm('Delete this message permanently?')"><input type="hidden" name="csrf_token" value="<?=e(csrf_token())?>"><input type="hidden" name="action" value="delete_message"><input type="hidden" name="id" value="<?=$id?>"><button class="small-action danger" type="submit">Delete</button></form></div></div>
-    <?php admin_footer(); exit; }
-    $filter=(string)($_GET['status']??'all'); if(!in_array($filter,['all','new','read','replied','archived'],true))$filter='all'; if($filter==='all')$rows=$pdo->query('SELECT * FROM contact_messages ORDER BY created_at DESC')->fetchAll();else{$stmt=$pdo->prepare('SELECT * FROM contact_messages WHERE status=? ORDER BY created_at DESC');$stmt->execute([$filter]);$rows=$stmt->fetchAll();} admin_header('Contact messages',$page,$flashes); ?>
-    <div class="admin-toolbar"><p class="panel-hint">Contact form submissions are saved here in your MySQL database. They do not automatically email you.</p><form method="get" class="filter-form"><input type="hidden" name="page" value="messages"><select name="status" onchange="this.form.submit()"><?php foreach(['all','new','read','replied','archived'] as $s): ?><option value="<?=$s?>" <?=$filter===$s?'selected':''?>><?=ucfirst($s)?></option><?php endforeach; ?></select></form></div><div class="admin-panel table-panel"><div class="table-scroll"><table class="admin-table"><thead><tr><th>Sender</th><th>Subject / message</th><th>Received</th><th>Status</th><th>Open</th></tr></thead><tbody><?php foreach($rows as $row): ?><tr><td><strong><?=e($row['name'])?></strong><small class="table-subline"><?=e($row['email'])?></small></td><td><?=e($row['subject']?:preview_text($row['message'],65))?></td><td><?=e($row['created_at'])?></td><td><span class="status-pill status-<?=e($row['status'])?>"><?=e(ucfirst($row['status']))?></span></td><td><a class="small-action" href="index.php?page=messages&view=<?=$row['id']?>">View</a></td></tr><?php endforeach; if(!$rows): ?><tr><td colspan="5">No messages found.</td></tr><?php endif; ?></tbody></table></div></div>
-    <?php admin_footer(); exit;
+
+// Normalized Content CRUD View
+if ($page === 'content') {
+    $type = (string)($_GET['type'] ?? 'skills');
+    if (!in_array($type, ['skills', 'experience', 'projects', 'education'], true)) {
+        http_response_code(404);
+        exit('Content section not found.');
+    }
+
+    $id = (int)($_GET['edit'] ?? 0);
+    $isForm = isset($_GET['new']) || $id > 0;
+    $item = [];
+    $responsibilities = '';
+    $tags = '';
+    $rows = [];
+
+    if ($isForm) {
+        if ($id > 0) {
+            if ($type === 'skills') {
+                $stmt = $pdo->prepare('SELECT s.*, g.name AS group_name FROM skills s JOIN skill_groups g ON s.group_id = g.id WHERE s.id = ?');
+                $stmt->execute([$id]);
+                $item = $stmt->fetch() ?: [];
+            } elseif ($type === 'experience') {
+                $stmt = $pdo->prepare('SELECT * FROM experience WHERE id = ?');
+                $stmt->execute([$id]);
+                $item = $stmt->fetch() ?: [];
+                $rStmt = $pdo->prepare('SELECT responsibility FROM experience_responsibilities WHERE experience_id = ? ORDER BY sort_order ASC');
+                $rStmt->execute([$id]);
+                $responsibilities = implode("\n", $rStmt->fetchAll(PDO::FETCH_COLUMN));
+            } elseif ($type === 'projects') {
+                $stmt = $pdo->prepare('SELECT * FROM projects WHERE id = ?');
+                $stmt->execute([$id]);
+                $item = $stmt->fetch() ?: [];
+                $tStmt = $pdo->prepare('SELECT tag_name FROM project_tags WHERE project_id = ?');
+                $tStmt->execute([$id]);
+                $tags = implode(', ', $tStmt->fetchAll(PDO::FETCH_COLUMN));
+            } elseif ($type === 'education') {
+                $stmt = $pdo->prepare('SELECT * FROM education WHERE id = ?');
+                $stmt->execute([$id]);
+                $item = $stmt->fetch() ?: [];
+            }
+
+            if (!$item) {
+                http_response_code(404);
+                exit('Record not found.');
+            }
+        }
+        $title = ($id ? 'Edit ' : 'Add ') . ucfirst($type);
+    } else {
+        if ($type === 'skills') {
+            $rows = $pdo->query('SELECT s.*, g.name AS group_name FROM skills s JOIN skill_groups g ON s.group_id = g.id ORDER BY s.sort_order ASC, s.id ASC')->fetchAll();
+        } else {
+            $rows = $pdo->query("SELECT * FROM `{$type}` ORDER BY sort_order ASC, id ASC")->fetchAll();
+        }
+        $title = ucfirst($type);
+    }
+
+    require __DIR__ . '/views/header.php';
+    require __DIR__ . '/views/content.php';
+    require __DIR__ . '/views/footer.php';
+    exit;
 }
-// Default dashboard.
-$stats=[]; foreach(['messages'=>'contact_messages','skills'=>'skills','projects'=>'projects','experience'=>'experience','education'=>'education'] as $k=>$table)$stats[$k]=(int)$pdo->query("SELECT COUNT(*) FROM `$table`")->fetchColumn();$stats['unread']=(int)$pdo->query("SELECT COUNT(*) FROM contact_messages WHERE status='new'")->fetchColumn();$recent=$pdo->query('SELECT * FROM contact_messages ORDER BY created_at DESC LIMIT 5')->fetchAll();
-admin_header('Dashboard','dashboard',$flashes); ?>
-<div class="stats-grid"><div class="stat-card"><span>Total messages</span><strong><?=$stats['messages']?></strong><small>Contact form inbox</small></div><div class="stat-card"><span>Unread messages</span><strong><?=$stats['unread']?></strong><small>Need your attention</small></div><div class="stat-card"><span>Skills</span><strong><?=$stats['skills']?></strong><small>Manage your toolkit</small></div><div class="stat-card"><span>Projects</span><strong><?=$stats['projects']?></strong><small>Portfolio highlights</small></div></div><div class="dashboard-columns"><div class="admin-panel"><div class="panel-title-row"><h2>Recent messages</h2><a class="small-action" href="index.php?page=messages">View inbox ↗</a></div><?php if(!$recent): ?><p class="panel-hint">Your contact inbox is empty. Messages submitted through the public contact form will appear here.</p><?php else: ?><div class="recent-list"><?php foreach($recent as $m): ?><a class="recent-message" href="index.php?page=messages&view=<?=$m['id']?>"><span class="recent-dot <?=$m['status']==='new'?'unread':''?>"></span><span class="recent-message-copy"><strong><?=e($m['name'])?></strong><small><?=e($m['subject']?:preview_text($m['message'],60))?></small></span><span class="recent-date"><?=e(date('M j',strtotime($m['created_at'])))?></span></a><?php endforeach; ?></div><?php endif; ?></div><div class="admin-panel quick-links"><h2>Quick actions</h2><a href="index.php?page=profile">◉ &nbsp; Update profile and photo <span>↗</span></a><a href="index.php?page=content&type=skills">✳ &nbsp; Edit skills <span>↗</span></a><a href="index.php?page=content&type=experience">▤ &nbsp; Update work experience <span>↗</span></a><a href="index.php?page=content&type=projects">◇ &nbsp; Manage projects <span>↗</span></a><a href="index.php?page=content&type=education">▣ &nbsp; Edit education <span>↗</span></a></div></div>
-<?php admin_footer(); ?>
+
+// Messages View
+if ($page === 'messages') {
+    $isDetail = isset($_GET['view']);
+    $message = [];
+    $rows = [];
+    $filter = 'all';
+
+    if ($isDetail) {
+        $id = (int)$_GET['view'];
+        $stmt = $pdo->prepare('SELECT * FROM contact_messages WHERE id = ?');
+        $stmt->execute([$id]);
+        $message = $stmt->fetch();
+
+        if (!$message) {
+            http_response_code(404);
+            exit('Message not found.');
+        }
+
+        if ($message['status'] === 'new') {
+            $pdo->prepare("UPDATE contact_messages SET status = 'read' WHERE id = ?")->execute([$id]);
+            $message['status'] = 'read';
+        }
+        $title = 'Message Details';
+    } else {
+        $filter = (string)($_GET['status'] ?? 'all');
+        if (!in_array($filter, ['all', 'new', 'read', 'replied', 'archived'], true)) {
+            $filter = 'all';
+        }
+
+        if ($filter === 'all') {
+            $rows = $pdo->query('SELECT * FROM contact_messages ORDER BY created_at DESC')->fetchAll();
+        } else {
+            $stmt = $pdo->prepare('SELECT * FROM contact_messages WHERE status = ? ORDER BY created_at DESC');
+            $stmt->execute([$filter]);
+            $rows = $stmt->fetchAll();
+        }
+        $title = 'Inbox';
+    }
+
+    require __DIR__ . '/views/header.php';
+    require __DIR__ . '/views/messages.php';
+    require __DIR__ . '/views/footer.php';
+    exit;
+}
+
+// -----------------------------------------------------------------------------
+// 3. Default View: Dashboard
+// -----------------------------------------------------------------------------
+$title = 'Dashboard';
+$stats = [
+    'messages'   => (int)$pdo->query("SELECT COUNT(*) FROM contact_messages")->fetchColumn(),
+    'unread'     => (int)$pdo->query("SELECT COUNT(*) FROM contact_messages WHERE status = 'new'")->fetchColumn(),
+    'skills'     => (int)$pdo->query("SELECT COUNT(*) FROM skills")->fetchColumn(),
+    'projects'   => (int)$pdo->query("SELECT COUNT(*) FROM projects")->fetchColumn(),
+    'experience' => (int)$pdo->query("SELECT COUNT(*) FROM experience")->fetchColumn(),
+    'education'  => (int)$pdo->query("SELECT COUNT(*) FROM education")->fetchColumn(),
+];
+
+$recent = $pdo->query('SELECT * FROM contact_messages ORDER BY created_at DESC LIMIT 5')->fetchAll();
+
+require __DIR__ . '/views/header.php';
+?>
+<div class="stats-grid">
+    <div class="stat-card"><span>Total Inquiries</span><strong><?= $stats['messages'] ?></strong><small>Saved messages</small></div>
+    <div class="stat-card"><span>Unread</span><strong><?= $stats['unread'] ?></strong><small>Pending action</small></div>
+    <div class="stat-card"><span>Skills</span><strong><?= $stats['skills'] ?></strong><small>Normalized skills</small></div>
+    <div class="stat-card"><span>Projects</span><strong><?= $stats['projects'] ?></strong><small>Portfolio projects</small></div>
+</div>
+<div class="dashboard-columns">
+    <div class="admin-panel">
+        <div class="panel-title-row">
+            <h2>Recent Messages</h2>
+            <a class="small-action" href="<?= e(url('admin/messages')) ?>">View All ↗</a>
+        </div>
+        <?php if (!$recent): ?>
+            <p class="panel-hint">No messages in inbox.</p>
+        <?php else: ?>
+            <div class="recent-list">
+                <?php foreach ($recent as $m): ?>
+                    <a class="recent-message" href="<?= e(url("admin/messages?view=" . $m['id'])) ?>">
+                        <span class="recent-dot <?= $m['status'] === 'new' ? 'unread' : '' ?>"></span>
+                        <span class="recent-message-copy">
+                            <strong><?= e($m['name']) ?></strong>
+                            <small><?= e($m['subject'] ?: preview_text($m['message'], 60)) ?></small>
+                        </span>
+                        <span class="recent-date"><?= e(date('M j', strtotime($m['created_at']))) ?></span>
+                    </a>
+                <?php endforeach; ?>
+            </div>
+        <?php endif; ?>
+    </div>
+    <div class="admin-panel quick-links">
+        <h2>Quick Shortcuts</h2>
+        <a href="<?= e(url('admin/profile')) ?>">◉ &nbsp; Update profile &amp; photo <span>↗</span></a>
+        <a href="<?= e(url('admin/content/skills')) ?>">✳ &nbsp; Edit skills <span>↗</span></a>
+        <a href="<?= e(url('admin/content/experience')) ?>">▤ &nbsp; Update work experience <span>↗</span></a>
+        <a href="<?= e(url('admin/content/projects')) ?>">◇ &nbsp; Manage projects <span>↗</span></a>
+        <a href="<?= e(url('admin/content/education')) ?>">▣ &nbsp; Edit education <span>↗</span></a>
+        <a href="<?= e(url('admin/smtp')) ?>">⚙ &nbsp; Configure SMTP server <span>↗</span></a>
+    </div>
+</div>
+<?php
+require __DIR__ . '/views/footer.php';

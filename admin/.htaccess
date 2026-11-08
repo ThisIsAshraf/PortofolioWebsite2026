@@ -1,0 +1,16 @@
+Options -Indexes
+RewriteEngine On
+
+# 1. Direct login route
+RewriteRule ^login/?$ login.php [L,QSA]
+
+# 2. Logout route
+RewriteRule ^logout/?$ index.php?action=logout [L,QSA]
+
+# 3. Content sub-routes: /admin/content/skills -> index.php?page=content&type=skills
+RewriteRule ^content/([a-zA-Z0-9_-]+)/?$ index.php?page=content&type=$1 [L,QSA]
+
+# 4. Standard admin page routes: /admin/profile, /admin/messages
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^([a-zA-Z0-9_-]+)/?$ index.php?page=$1 [L,QSA]

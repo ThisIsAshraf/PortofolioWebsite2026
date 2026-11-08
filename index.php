@@ -1,51 +1,166 @@
 <?php
+
+declare(strict_types=1);
+
 require_once __DIR__ . '/config.php';
+
+use PHPMailer\PHPMailer\PHPMailer;
+
 $pdo = db();
+
+// Handle Contact Form Submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'contact') {
-    verify_csrf();
-    $name = trim((string)($_POST['name'] ?? ''));
-    $email = trim((string)($_POST['email'] ?? ''));
-    $subject = trim((string)($_POST['subject'] ?? ''));
-    $message = trim((string)($_POST['message'] ?? ''));
+    $isAjax = (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest')
+        || (isset($_SERVER['HTTP_ACCEPT']) && str_contains($_SERVER['HTTP_ACCEPT'], 'application/json'));
+
+    $respond = function (bool $success, string $message, int $statusCode = 200) use ($isAjax) {
+        if ($isAjax) {
+            while (ob_get_level() > 0) {
+                ob_end_clean();
+            }
+            http_response_code($statusCode);
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode([
+                'success' => $success,
+                'message' => $message,
+                'csrf_token' => csrf_token()
+            ]);
+            exit;
+        }
+
+        flash($success ? 'success' : 'error', $message);
+        redirect('index.php#contact');
+    };
+
+    // CSRF Check
+    $sentToken = $_POST['csrf_token'] ?? '';
+    if (!is_string($sentToken) || !hash_equals(csrf_token(), $sentToken)) {
+        $respond(false, 'Your session expired. Please reload the page and try again.', 419);
+    }
+
+    $name     = trim((string)($_POST['name'] ?? ''));
+    $email    = trim((string)($_POST['email'] ?? ''));
+    $subject  = trim((string)($_POST['subject'] ?? ''));
+    $message  = trim((string)($_POST['message'] ?? ''));
     $honeypot = trim((string)($_POST['website'] ?? ''));
+
+    // Bot honeypot filter
     if ($honeypot !== '') {
-        flash('success', 'Thanks for your message.');
-        redirect('index.php#contact');
+        $respond(true, 'Thanks for your message.');
     }
+
     if ($name === '' || !filter_var($email, FILTER_VALIDATE_EMAIL) || $message === '') {
-        flash('error', 'Please enter your name, a valid email address, and a message.');
-        redirect('index.php#contact');
+        $respond(false, 'Please provide your name, a valid email address, and your message.', 422);
     }
+
     if (strlen($name) > 120 || strlen($email) > 254 || strlen($subject) > 180 || strlen($message) > 5000) {
-        flash('error', 'One or more fields are too long.');
-        redirect('index.php#contact');
+        $respond(false, 'One or more form fields exceeded character limits.', 422);
     }
-    $stmt = $pdo->prepare('INSERT INTO contact_messages (name,email,subject,message) VALUES (?,?,?,?)');
+
+    // 1. Store in Database
+    $stmt = $pdo->prepare('INSERT INTO contact_messages (name, email, subject, message) VALUES (?, ?, ?, ?)');
     $stmt->execute([$name, $email, $subject !== '' ? $subject : null, $message]);
-    flash('success', 'Thanks for reaching out. Your message has been submitted.');
-    redirect('index.php#contact');
+
+    // 2. Dispatch Email Notification using DB/Config SMTP Settings
+    $smtp = get_smtp_config();
+    $adminEmail = setting('email', $smtp['username'] ?? '');
+
+    if (!empty($smtp['is_active']) && !empty($smtp['host']) && !empty($smtp['username']) && !empty($smtp['password']) && !empty($adminEmail)) {
+        try {
+            $mail = new PHPMailer(true);
+            $mail->isSMTP();
+            $mail->Timeout    = 5;
+            $mail->Host       = $smtp['host'];
+            $mail->SMTPAuth   = true;
+            $mail->Username   = $smtp['username'];
+            $mail->Password   = $smtp['password'];
+            $mail->SMTPSecure = ($smtp['encryption'] === 'ssl')
+                ? PHPMailer::ENCRYPTION_SMTPS
+                : PHPMailer::ENCRYPTION_STARTTLS;
+            $mail->Port       = (int)$smtp['port'];
+
+            $mail->setFrom($smtp['from_email'] ?: $smtp['username'], (string)($smtp['from_name'] ?: 'Portfolio Bot'));
+            $mail->addAddress($adminEmail);
+            $mail->addReplyTo($email, $name);
+
+            $mail->isHTML(true);
+            $mail->Subject = 'New Portfolio Inquiry: ' . ($subject ?: 'General Message');
+            $mail->Body    = '<h3>New Contact Message</h3>'
+                . '<p><strong>Sender:</strong> ' . e($name) . '</p>'
+                . '<p><strong>Email:</strong> ' . e($email) . '</p>'
+                . '<p><strong>Subject:</strong> ' . e($subject ?: 'None') . '</p>'
+                . '<p><strong>Message:</strong><br>' . nl2br(e($message)) . '</p>';
+            $mail->AltBody = "Sender: {$name}\nEmail: {$email}\nSubject: {$subject}\n\nMessage:\n{$message}";
+
+            $mail->send();
+        } catch (\Throwable $e) {
+            error_log('PHPMailer error: ' . $e->getMessage());
+        }
+    }
+
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+    $respond(true, 'Thank you! Your message has been sent successfully.');
 }
+
+// Fetch Profile Details
 $profile = [
-    'name' => setting('name', 'Ashraful Alam Shihab'),
-    'role' => setting('role', 'Senior Desktop Support Engineer'),
+    'name'     => setting('name', 'Ashraful Alam Shihab'),
+    'role'     => setting('role', 'Senior Desktop Support Engineer'),
     'location' => setting('location', 'Dhaka, Bangladesh'),
     'headline' => setting('headline', 'IT support, systems administration, and reliable technology experiences.'),
-    'intro' => setting('intro', 'I help people and teams work confidently with technology.'),
+    'intro'    => setting('intro', 'I help people and teams work confidently with technology.'),
     'linkedin' => setting('linkedin', 'https://www.linkedin.com/in/ashraful98/'),
-    'email' => setting('email', ''),
-    'phone' => setting('phone', ''),
-    'photo' => setting('photo', '')
+    'email'    => setting('email', ''),
+    'phone'    => setting('phone', ''),
+    'photo'    => setting('photo', '')
 ];
-$skills = $pdo->query('SELECT * FROM skills WHERE is_visible=1 ORDER BY sort_order,id')->fetchAll();
-$experience = $pdo->query('SELECT * FROM experience WHERE is_visible=1 ORDER BY sort_order,id')->fetchAll();
-$projects = $pdo->query('SELECT * FROM projects WHERE is_visible=1 ORDER BY sort_order,id')->fetchAll();
-$education = $pdo->query('SELECT * FROM education WHERE is_visible=1 ORDER BY sort_order,id')->fetchAll();
+
+// Fetch Normalized Skills & Skill Groups
+$skillsStmt = $pdo->query('
+    SELECT s.*, g.name AS group_name 
+    FROM skills s 
+    JOIN skill_groups g ON s.group_id = g.id 
+    WHERE s.is_visible = 1 
+    ORDER BY g.sort_order ASC, s.sort_order ASC, s.id ASC
+');
+$skills = $skillsStmt->fetchAll();
+
 $groups = [];
-foreach ($skills as $skill) $groups[$skill['group_name']] = true;
+foreach ($skills as $skill) {
+    $groups[$skill['group_name']] = true;
+}
+
+// Fetch Normalized Work Experience with Responsibilities
+$expStmt = $pdo->query('SELECT * FROM experience WHERE is_visible = 1 ORDER BY sort_order ASC, id ASC');
+$experience = $expStmt->fetchAll();
+
+$respStmt = $pdo->query('SELECT * FROM experience_responsibilities ORDER BY sort_order ASC, id ASC');
+$allResponsibilities = $respStmt->fetchAll();
+
+$expResponsibilities = [];
+foreach ($allResponsibilities as $r) {
+    $expResponsibilities[$r['experience_id']][] = $r['responsibility'];
+}
+
+// Fetch Normalized Projects with Tags
+$projStmt = $pdo->query('SELECT * FROM projects WHERE is_visible = 1 ORDER BY sort_order ASC, id ASC');
+$projects = $projStmt->fetchAll();
+
+$tagStmt = $pdo->query('SELECT * FROM project_tags');
+$allTags = $tagStmt->fetchAll();
+
+$projectTags = [];
+foreach ($allTags as $t) {
+    $projectTags[$t['project_id']][] = $t['tag_name'];
+}
+
+// Fetch Education
+$education = $pdo->query('SELECT * FROM education WHERE is_visible = 1 ORDER BY sort_order ASC, id ASC')->fetchAll();
+
 $flashes = take_flashes();
-$first = explode(' ', trim($profile['name']));
-$firstName = array_shift($first);
-$remainingName = implode(' ', $first);
+$nameParts = explode(' ', trim($profile['name']));
+$firstName = array_shift($nameParts);
+$remainingName = implode(' ', $nameParts);
 ?>
 <!doctype html>
 <html lang="en">
@@ -53,24 +168,39 @@ $remainingName = implode(' ', $first);
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="<?= e($profile['name']) ?> — <?= e($profile['role']) ?> portfolio">
+    <meta name="description" content="<?= e($profile['name']) ?> — <?= e($profile['role']) ?> Portfolio">
     <meta name="theme-color" content="#0b0d12">
-    <title><?= e($profile['name']) ?> — IT Support & Operations</title>
+    <title><?= e($profile['name']) ?> — <?= e($profile['role']) ?></title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="assets/css/style.css">
-    <script defer src="assets/js/main.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400..700;1,9..40,400..700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="<?= e(url('assets/css/style.css')) ?>">
+    <script defer src="<?= e(url('assets/js/main.js')) ?>"></script>
 </head>
 
 <body>
     <div class="page-glow glow-one"></div>
     <div class="page-glow glow-two"></div>
+
     <header class="site-header" id="top">
-        <nav class="nav container" aria-label="Main navigation"><a class="brand" href="#top"><span class="brand-mark">S.</span><span>SHIHAB<span class="brand-dot">/</span></span></a><button class="menu-toggle" id="menuToggle" aria-label="Open navigation" aria-expanded="false"><span></span><span></span></button>
-            <div class="nav-links" id="navLinks"><a href="#about">About</a><a href="#skills">Skills</a><a href="#experience">Experience</a><a href="#projects">Projects</a><a href="#education">Education</a><a class="nav-contact" href="#contact">Let's talk <span>↗</span></a><button class="theme-toggle" id="themeToggle" type="button" aria-label="Toggle theme">☼</button></div>
+        <nav class="nav container" aria-label="Main navigation">
+            <a class="brand" href="<?= e(url('#top')) ?>"><span class="brand-mark">S.</span><span>SHIHAB<span class="brand-dot">/</span></span></a>
+            <button class="menu-toggle" id="menuToggle" aria-label="Open navigation" aria-expanded="false">
+                <span></span><span></span>
+            </button>
+            <div class="nav-links" id="navLinks">
+                <a href="#about">About</a>
+                <a href="#skills">Skills</a>
+                <a href="#experience">Experience</a>
+                <a href="#projects">Projects</a>
+                <a href="#education">Education</a>
+                <a href="<?= e(url('download-cv.php')) ?>" target="_blank" class="nav-cv-btn">Download CV 📄</a>
+                <a class="nav-contact" href="#contact">Let's talk <span>↗</span></a>
+                <button class="theme-toggle" id="themeToggle" type="button" aria-label="Toggle theme">☼</button>
+            </div>
         </nav>
     </header>
+
     <main>
         <section class="hero container" id="home">
             <div class="hero-copy">
@@ -79,26 +209,61 @@ $remainingName = implode(' ', $first);
                 <h1><?= e($firstName) ?><br><span><?= e($remainingName) ?>.</span></h1>
                 <p class="hero-role"><?= e($profile['role']) ?> <span class="role-divider">/</span> <?= e($profile['location']) ?></p>
                 <p class="hero-description"><?= e($profile['intro']) ?></p>
-                <div class="hero-actions"><a class="button button-primary" href="#experience">Explore my experience <span>↘</span></a><a class="button button-quiet" href="#contact">Contact me <span>↗</span></a></div>
-                <div class="hero-socials"><?php if ($profile['linkedin']): ?><a href="<?= e($profile['linkedin']) ?>" target="_blank" rel="noopener noreferrer">LinkedIn <span>↗</span></a><?php endif; ?><span class="social-separator"></span><a href="#projects">Selected work <span>↘</span></a></div><?php if ($profile['phone'] || $profile['email']): ?><div class="hero-contact-details" aria-label="Contact details"><?php if ($profile['phone']): ?><a href="tel:<?= e(preg_replace('/[^0-9+]/', '', $profile['phone'])) ?>"><span class="detail-label">☎ </span><span><?= e($profile['phone']) ?></span></a><?php endif; ?><?php if ($profile['email']): ?><a href="mailto:<?= e($profile['email']) ?>"><span class="detail-label"> | 📧 </span><span><?= e($profile['email']) ?></span></a><?php endif; ?></div><?php endif; ?>
+
+                <div class="hero-actions">
+                    <a class="button button-primary" href="#experience">Explore my experience <span>↘</span></a>
+                    <a class="button button-quiet" href="<?= e(url('download-cv.php')) ?>" target="_blank">Download CV <span>↗</span></a>
+                </div>
+
+                <div class="hero-socials">
+                    <?php if ($profile['linkedin']): ?>
+                        <a href="<?= e($profile['linkedin']) ?>" target="_blank" rel="noopener noreferrer">LinkedIn <span>↗</span></a>
+                    <?php endif; ?>
+                    <span class="social-separator"></span>
+                    <a href="#projects">Selected work <span>↘</span></a>
+                </div>
+
+                <?php if ($profile['phone'] || $profile['email']): ?>
+                    <div class="hero-contact-details" aria-label="Contact details">
+                        <?php if ($profile['phone']): ?>
+                            <a href="tel:<?= e(preg_replace('/[^0-9+]/', '', $profile['phone'])) ?>">
+                                <span class="detail-label">☎ </span><span><?= e($profile['phone']) ?></span>
+                            </a>
+                        <?php endif; ?>
+                        <?php if ($profile['email']): ?>
+                            <a href="mailto:<?= e($profile['email']) ?>">
+                                <span class="detail-label"> | 📧 </span><span><?= e($profile['email']) ?></span>
+                            </a>
+                        <?php endif; ?>
+                    </div>
+                <?php endif; ?>
             </div>
+
             <div class="hero-visual">
                 <div class="visual-orbit orbit-a"></div>
                 <div class="visual-orbit orbit-b"></div>
                 <div class="portrait-card">
                     <div class="portrait-topline"><span>PROFILE / 001</span><span>IT · SYSTEMS</span></div>
-                    <div class="portrait-placeholder" role="img" aria-label="Profile portrait"><?php if ($profile['photo'] && is_file(__DIR__ . '/uploads/' . $profile['photo'])): ?><img src="uploads/<?= e($profile['photo']) ?>" alt="<?= e($profile['name']) ?>" class="profile-photo"><?php else: ?><div class="portrait-grid"></div>
+                    <div class="portrait-placeholder" role="img" aria-label="Profile portrait">
+                        <?php if ($profile['photo'] && is_file(__DIR__ . '/uploads/' . $profile['photo'])): ?>
+                            <img src="<?= e(url('uploads/' . $profile['photo'])) ?>" alt="<?= e($profile['name']) ?>" class="profile-photo">
+                        <?php else: ?>
+                            <div class="portrait-grid"></div>
                             <div class="portrait-initials">AS<span>.</span></div>
-                            <div class="portrait-hint">ADD YOUR PHOTO IN ADMIN</div><?php endif; ?>
+                            <div class="portrait-hint">PORTFOLIO PROFILE</div>
+                        <?php endif; ?>
                     </div>
                     <div class="portrait-caption">
-                        <div><strong><?= e($profile['name']) ?></strong><span>Support. Systems. Solutions.</span></div><span class="caption-arrow">↗</span>
+                        <div><strong><?= e($profile['name']) ?></strong><span>Support. Systems. Solutions.</span></div>
+                        <span class="caption-arrow">↗</span>
                     </div>
                 </div>
                 <div class="floating-chip chip-top"><span class="chip-icon">✳</span><span>Reliable IT support</span></div>
                 <div class="floating-chip chip-bottom"><span class="chip-pulse"></span><span>Always learning</span></div>
-            </div><a class="scroll-cue" href="#about"><span class="scroll-line"></span> SCROLL TO EXPLORE</a>
+            </div>
+            <a class="scroll-cue" href="#about"><span class="scroll-line"></span> SCROLL TO EXPLORE</a>
         </section>
+
         <section class="section about-section" id="about">
             <div class="container section-grid">
                 <div class="section-heading reveal">
@@ -111,33 +276,49 @@ $remainingName = implode(' ', $first);
                     <div class="stat-grid">
                         <div class="stat"><strong>L1/L2</strong><span>End-user support</span></div>
                         <div class="stat"><strong>IT</strong><span>Support & operations</span></div>
-                        <div class="stat"><strong>4+</strong><span>Years in IT support roles</span></div>
+                        <div class="stat"><strong>4+</strong><span>Years experience</span></div>
                     </div>
                 </div>
             </div>
         </section>
+
         <section class="section skills-section" id="skills">
             <div class="container">
                 <div class="section-heading section-heading-wide reveal">
                     <div>
                         <p class="eyebrow">02 / TOOLKIT</p>
-                        <h2>Skills & <span>strengths.</span></h2>
+                        <h2>Skills &amp; <span>strengths.</span></h2>
                     </div>
-                    <p class="section-intro">A practical mix of user support, SaaS administration, IT operations, and developing infrastructure skills.</p>
+                    <p class="section-intro">A practical mix of end-user support, SaaS administration, IT operations, and cloud infrastructure.</p>
                 </div>
-                <div class="skill-filters reveal"><button class="filter-button active" data-filter="all">All skills</button><?php foreach (array_keys($groups) as $group): ?><button class="filter-button" data-filter="<?= e(strtolower(str_replace(' ', '-', $group))) ?>"><?= e($group) ?></button><?php endforeach; ?></div>
-                <div class="skills-grid"><?php foreach ($skills as $i => $skill): ?><article class="skill-card reveal" data-group="<?= e(strtolower(str_replace(' ', '-', $skill['group_name']))) ?>">
-                            <div class="skill-card-top"><span class="skill-symbol">✳</span><span class="skill-status"><?= e($skill['level']) ?></span></div>
+                <div class="skill-filters reveal">
+                    <button class="filter-button active" data-filter="all">All skills</button>
+                    <?php foreach (array_keys($groups) as $group): ?>
+                        <button class="filter-button" data-filter="<?= e(strtolower(str_replace(' ', '-', (string)$group))) ?>"><?= e((string)$group) ?></button>
+                    <?php endforeach; ?>
+                </div>
+                <div class="skills-grid">
+                    <?php foreach ($skills as $skill): ?>
+                        <article class="skill-card reveal" data-group="<?= e(strtolower(str_replace(' ', '-', (string)$skill['group_name']))) ?>">
+                            <div class="skill-card-top">
+                                <span class="skill-symbol">✳</span>
+                                <span class="skill-status"><?= e($skill['level']) ?></span>
+                            </div>
                             <h3><?= e($skill['name']) ?></h3>
                             <p><?= e($skill['group_name']) ?></p>
-                        </article><?php endforeach; ?></div>
-                <div class="learning-note reveal"><span class="learning-icon">↗</span>
-                    <div><strong>Currently growing</strong>
-                        <p>Microsoft 365 Administration · Microsoft Entra ID · Azure Administrator (AZ-104 learning path)</p>
+                        </article>
+                    <?php endforeach; ?>
+                </div>
+                <div class="learning-note reveal">
+                    <span class="learning-icon">↗</span>
+                    <div>
+                        <strong>Currently growing</strong>
+                        <p>Microsoft 365 Administration · Microsoft Entra ID · Azure Administrator (AZ-104 path)</p>
                     </div>
                 </div>
             </div>
         </section>
+
         <section class="section experience-section" id="experience">
             <div class="container">
                 <div class="section-heading section-heading-wide reveal">
@@ -145,9 +326,11 @@ $remainingName = implode(' ', $first);
                         <p class="eyebrow">03 / CAREER</p>
                         <h2>Work <span>experience.</span></h2>
                     </div>
-                    <p class="section-intro">The roles, responsibilities, and practical experience that have shaped my approach to IT.</p>
+                    <p class="section-intro">Roles, duties, and practical problem solving across dynamic infrastructure environments.</p>
                 </div>
-                <div class="timeline"><?php foreach ($experience as $i => $job): ?><article class="timeline-item reveal">
+                <div class="timeline">
+                    <?php foreach ($experience as $i => $job): ?>
+                        <article class="timeline-item reveal">
                             <div class="timeline-marker"><span></span></div>
                             <div class="timeline-date"><?= e($job['period']) ?></div>
                             <div class="timeline-content">
@@ -155,42 +338,69 @@ $remainingName = implode(' ', $first);
                                     <div>
                                         <h3><?= e($job['role']) ?></h3>
                                         <p class="company"><?= e($job['company']) ?> <span>·</span> <?= e($job['location'] ?? '') ?></p>
-                                    </div><span class="job-index"><?= e(str_pad((string)($i + 1), 2, '0', STR_PAD_LEFT)) ?></span>
+                                    </div>
+                                    <span class="job-index"><?= e(str_pad((string)($i + 1), 2, '0', STR_PAD_LEFT)) ?></span>
                                 </div>
-                                <ul><?php foreach (parse_json_list($job['description']) as $point): ?><li><?= e((string)$point) ?></li><?php endforeach; ?></ul>
+                                <ul>
+                                    <?php
+                                    $bullets = $expResponsibilities[$job['id']] ?? [];
+                                    foreach ($bullets as $point):
+                                    ?>
+                                        <li><?= e((string)$point) ?></li>
+                                    <?php endforeach; ?>
+                                </ul>
                             </div>
-                        </article><?php endforeach; ?></div>
+                        </article>
+                    <?php endforeach; ?>
+                </div>
             </div>
         </section>
+
         <section class="section projects-section" id="projects">
             <div class="container">
                 <div class="section-heading section-heading-wide reveal">
                     <div>
                         <p class="eyebrow">04 / SELECTED WORK</p>
-                        <h2>Work that <span>matters.</span></h2>
+                        <h2>Key <span>initiatives.</span></h2>
                     </div>
-                    <p class="section-intro">Experience highlights and initiatives.</p>
+                    <p class="section-intro">Infrastructure upgrades, systems operations, and user workflow enhancements.</p>
                 </div>
-                <div class="projects-grid"><?php foreach ($projects as $i => $project): ?><article class="project-card reveal">
-                            <div class="project-art project-art-<?= ($i % 3) + 1 ?>"><span class="project-number"><?= e(str_pad((string)($i + 1), 2, '0', STR_PAD_LEFT)) ?></span>
-                                <div class="network-art"><i></i><i></i><i></i><i></i><b></b><b></b><b></b></div><span class="project-art-label"><?= e($project['project_type']) ?></span>
+                <div class="projects-grid">
+                    <?php foreach ($projects as $i => $project): ?>
+                        <article class="project-card reveal">
+                            <div class="project-art project-art-<?= ($i % 3) + 1 ?>">
+                                <span class="project-number"><?= e(str_pad((string)($i + 1), 2, '0', STR_PAD_LEFT)) ?></span>
+                                <div class="network-art"><i></i><i></i><i></i><i></i><b></b><b></b><b></b></div>
+                                <span class="project-art-label"><?= e($project['project_type']) ?></span>
                             </div>
                             <div class="project-info">
                                 <p class="project-type"><?= e($project['project_type']) ?></p>
                                 <h3><?= e($project['title']) ?></h3>
                                 <p><?= e($project['description']) ?></p>
-                                <div class="tag-list"><?php foreach (parse_json_list($project['tags']) as $tag): ?><span><?= e((string)$tag) ?></span><?php endforeach; ?></div>
+                                <div class="tag-list">
+                                    <?php
+                                    $tags = $projectTags[$project['id']] ?? [];
+                                    foreach ($tags as $tag):
+                                    ?>
+                                        <span><?= e((string)$tag) ?></span>
+                                    <?php endforeach; ?>
+                                </div>
                             </div>
-                        </article><?php endforeach; ?></div>
+                        </article>
+                    <?php endforeach; ?>
+                </div>
             </div>
         </section>
+
         <section class="section education-section" id="education">
             <div class="container section-grid">
                 <div class="section-heading reveal">
                     <p class="eyebrow">05 / EDUCATION</p>
-                    <h2>Built on a<br><span>strong foundation.</span></h2>
+                    <h2>Academic<br><span>background.</span></h2>
                 </div>
-                <div class="education-list"><?php foreach ($education as $item): ?><article class="education-card reveal">
+                <div class="education-list">
+                    <?php foreach ($education as $item): ?>
+                        <article class="education-card reveal">
                             <div class="education-icon">↗</div>
                             <div>
                                 <p class="education-period"><?= e($item['period']) ?></p>
@@ -198,40 +408,105 @@ $remainingName = implode(' ', $first);
                                 <p class="education-institution"><?= e($item['institution']) ?></p>
                                 <p class="education-detail"><?= e($item['detail'] ?? '') ?></p>
                             </div>
-                        </article><?php endforeach; ?><div class="learning-card reveal">
+                        </article>
+                    <?php endforeach; ?>
+                    <div class="learning-card reveal">
                         <div class="learning-icon">◎</div>
                         <div>
                             <p class="eyebrow">CONTINUOUS LEARNING</p>
-                            <h3>Building toward cloud & systems administration</h3>
-                            <p>Focused on Microsoft 365, Entra ID, Azure administration, and practical lab-based learning.</p>
+                            <h3>Building toward cloud &amp; enterprise infrastructure</h3>
+                            <p>Focused on Microsoft 365, Entra ID, Azure administration, and lab-based deployments.</p>
                         </div>
                     </div>
                 </div>
             </div>
         </section>
+
         <section class="section contact-section" id="contact">
             <div class="container contact-layout">
                 <div class="contact-copy reveal">
                     <p class="eyebrow">06 / GET IN TOUCH</p>
-                    <h2>Have a challenge?<br><span>Let’s talk.</span></h2>
-                    <p>For IT support opportunities, collaboration, or a professional conversation, send me a message.</p><?php if ($profile['linkedin']): ?><a class="contact-link" href="<?= e($profile['linkedin']) ?>" target="_blank" rel="noopener noreferrer"><span class="contact-link-icon">in</span><span><small>CONNECT ON</small><strong>LinkedIn</strong></span><span class="contact-arrow">↗</span></a><?php endif; ?><?php if ($profile['email']): ?><a class="contact-link" href="mailto:<?= e($profile['email']) ?>"><span class="contact-link-icon">@</span><span><small>EMAIL ME</small><strong><?= e($profile['email']) ?></strong></span><span class="contact-arrow">↗</span></a><?php endif; ?><?php if ($profile['phone']): ?><a class="contact-link" href="tel:<?= e(preg_replace('/[^0-9+]/', '', $profile['phone'])) ?>"><span class="contact-link-icon">☎</span><span><small>CALL ME</small><strong><?= e($profile['phone']) ?></strong></span><span class="contact-arrow">↗</span></a><?php endif; ?><div class="contact-location"><span class="status-dot"></span> Based in <?= e($profile['location']) ?></div>
+                    <h2>Have an opening?<br><span>Let’s connect.</span></h2>
+                    <p>For IT support opportunities, systems administration, or project collaboration, send me a note.</p>
+
+                    <?php if ($profile['linkedin']): ?>
+                        <a class="contact-link" href="<?= e($profile['linkedin']) ?>" target="_blank" rel="noopener noreferrer">
+                            <span class="contact-link-icon">in</span>
+                            <span><small>CONNECT ON</small><strong>LinkedIn</strong></span>
+                            <span class="contact-arrow">↗</span>
+                        </a>
+                    <?php endif; ?>
+                    <?php if ($profile['email']): ?>
+                        <a class="contact-link" href="mailto:<?= e($profile['email']) ?>">
+                            <span class="contact-link-icon">@</span>
+                            <span><small>EMAIL ME</small><strong><?= e($profile['email']) ?></strong></span>
+                            <span class="contact-arrow">↗</span>
+                        </a>
+                    <?php endif; ?>
+                    <?php if ($profile['phone']): ?>
+                        <a class="contact-link" href="tel:<?= e(preg_replace('/[^0-9+]/', '', $profile['phone'])) ?>">
+                            <span class="contact-link-icon">☎</span>
+                            <span><small>CALL ME</small><strong><?= e($profile['phone']) ?></strong></span>
+                            <span class="contact-arrow">↗</span>
+                        </a>
+                    <?php endif; ?>
+
+                    <div class="contact-location"><span class="status-dot"></span> Located in <?= e($profile['location']) ?></div>
                 </div>
+
                 <div class="contact-form-wrap reveal">
-                    <div class="form-header"><span>MESSAGE / 001</span><span class="form-asterisk">✳</span></div><?php foreach ($flashes as $f): ?><div class="flash flash-<?= e($f['type']) ?>" role="status"><?= e($f['message']) ?></div><?php endforeach; ?><form action="index.php#contact" method="post" id="contactForm"><input type="hidden" name="action" value="contact"><input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
-                        <div class="honeypot" aria-hidden="true"><label for="website">Leave empty</label><input id="website" name="website" tabindex="-1" autocomplete="off"></div>
-                        <div class="form-row"><label for="name">Your name <span>*</span><input id="name" name="name" type="text" placeholder="Jane Smith" maxlength="120" required></label><label for="email">Email address <span>*</span><input id="email" name="email" type="email" placeholder="jane@example.com" maxlength="254" required></label></div><label for="subject">Subject<input id="subject" name="subject" type="text" placeholder="What would you like to discuss?" maxlength="180"></label><label for="message">Your message <span>*</span><textarea id="message" name="message" rows="5" maxlength="5000" placeholder="Write your message here..." required></textarea></label>
-                        <div class="form-bottom">
-                            <p><span>*</span> Required fields</p><button class="button button-primary submit-button" type="submit">Send message <span>↗</span></button>
+                    <div class="form-header"><span>INQUIRY FORM</span><span class="form-asterisk">✳</span></div>
+
+                    <div id="formAlertBox">
+                        <?php foreach ($flashes as $f): ?>
+                            <div class="flash flash-<?= e($f['type']) ?>" role="status"><?= e($f['message']) ?></div>
+                        <?php endforeach; ?>
+                    </div>
+
+                    <form action="<?= e(url('index.php')) ?>" method="post" id="contactForm">
+                        <input type="hidden" name="action" value="contact">
+                        <input type="hidden" name="csrf_token" id="csrfTokenField" value="<?= e(csrf_token()) ?>">
+
+                        <!-- Anti-bot Honeypot Field -->
+                        <div class="honeypot" aria-hidden="true" style="display:none !important;">
+                            <label for="website">Leave blank</label>
+                            <input id="website" name="website" tabindex="-1" autocomplete="off">
                         </div>
-                        <p class="privacy-note">Your message is stored for follow-up. Please avoid sending sensitive personal information.</p>
+
+                        <div class="form-row">
+                            <label for="name">Your Name <span>*</span>
+                                <input id="name" name="name" type="text" placeholder="Jane Doe" maxlength="120" required>
+                            </label>
+                            <label for="email">Email Address <span>*</span>
+                                <input id="email" name="email" type="email" placeholder="jane@example.com" maxlength="254" required>
+                            </label>
+                        </div>
+                        <label for="subject">Subject
+                            <input id="subject" name="subject" type="text" placeholder="Opportunity / Consultation" maxlength="180">
+                        </label>
+                        <label for="message">Message <span>*</span>
+                            <textarea id="message" name="message" rows="5" maxlength="5000" placeholder="How can I assist your team?" required></textarea>
+                        </label>
+                        <div class="form-bottom">
+                            <p><span>*</span> Required fields</p>
+                            <button class="button button-primary submit-button" id="submitBtn" type="submit">
+                                <span class="btn-text">Send message</span> <span>↗</span>
+                            </button>
+                        </div>
+                        <p class="privacy-note">Messages are received directly into my inbox and admin panel.</p>
                     </form>
                 </div>
             </div>
         </section>
     </main>
+
     <footer class="site-footer">
-        <div class="container footer-inner"><a class="brand" href="#top"><span class="brand-mark">S.</span><span>SHIHAB<span class="brand-dot">/</span></span></a>
-            <p>Designed with purpose. Built to keep things moving.</p><a href="#top" class="back-top">BACK TO TOP ↑</a><span class="copyright">© <?= date('Y') ?> <?= e($profile['name']) ?></span><a class="admin-footer-link" href="admin/login.php">Admin</a>
+        <div class="container footer-inner">
+            <a class="brand" href="#top"><span class="brand-mark">S.</span><span>SHIHAB<span class="brand-dot">/</span></span></a>
+            <p>Designed with purpose. Built to keep systems moving.</p>
+            <a href="#top" class="back-top">BACK TO TOP ↑</a>
+            <span class="copyright">&copy; <?= date('Y') ?> <?= e($profile['name']) ?></span>
+            <a class="admin-footer-link" href="<?= e(url('admin/login')) ?>">Admin</a>
         </div>
     </footer>
 </body>
