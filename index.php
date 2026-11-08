@@ -102,19 +102,59 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'conta
     $respond(true, 'Thank you! Your message has been sent successfully.');
 }
 
-// Fetch Profile Details & Dynamic Settings
+// Fetch Profile Details, Dynamic Section Copy & Learning Badges
 $profile = [
-    'name'           => setting('name', 'Ashraful Alam Shihab'),
-    'role'           => setting('role', 'Senior Desktop Support Engineer'),
-    'location'       => setting('location', 'Dhaka, Bangladesh'),
-    'headline'       => setting('headline', 'IT support, systems administration, and reliable technology experiences.'),
-    'intro'          => setting('intro', 'I help people and teams work confidently with technology.'),
-    'linkedin'       => setting('linkedin', 'https://www.linkedin.com/in/ashraful98/'),
-    'email'          => setting('email', ''),
-    'phone'          => setting('phone', ''),
-    'photo'          => setting('photo', ''),
-    'learning_title' => setting('learning_title', 'Currently growing'),
-    'learning_text'  => setting('learning_text', 'Microsoft 365 Administration · Microsoft Entra ID · Azure Administrator (AZ-104 path)')
+    'name'                => setting('name', 'Ashraful Alam Shihab'),
+    'role'                => setting('role', 'Senior Desktop Support Engineer'),
+    'location'            => setting('location', 'Dhaka, Bangladesh'),
+    'headline'            => setting('headline', 'IT support, systems administration, and reliable technology experiences.'),
+    'intro'               => setting('intro', 'I help people and teams work confidently with technology—from end-user support and SaaS administration to IT assets, vendor coordination, and office infrastructure.'),
+    'linkedin'            => setting('linkedin', 'https://www.linkedin.com/in/ashraful98/'),
+    'email'               => setting('email', ''),
+    'phone'               => setting('phone', ''),
+    'photo'               => setting('photo', ''),
+    'availability_status' => setting('availability_status', 'IT SUPPORT · OPERATIONS · INFRASTRUCTURE'),
+    'github'              => setting('github', ''),
+
+    // Dynamic Section 01: About
+    'sec_about_kicker'    => setting('sec_about_kicker', '01 / ABOUT'),
+    'sec_about_title'     => setting('sec_about_title', 'Making technology'),
+    'sec_about_accent'    => setting('sec_about_accent', 'work for people.'),
+
+    // Dynamic Section 02: Skills
+    'sec_skills_kicker'   => setting('sec_skills_kicker', '02 / TOOLKIT'),
+    'sec_skills_title'    => setting('sec_skills_title', 'Skills &'),
+    'sec_skills_accent'   => setting('sec_skills_accent', 'strengths.'),
+    'sec_skills_intro'    => setting('sec_skills_intro', 'A practical mix of user support, SaaS administration, IT operations, and developing infrastructure skills.'),
+
+    // Dynamic Section 03: Experience
+    'sec_exp_kicker'      => setting('sec_exp_kicker', '03 / CAREER'),
+    'sec_exp_title'       => setting('sec_exp_title', 'Work'),
+    'sec_exp_accent'      => setting('sec_exp_accent', 'experience.'),
+    'sec_exp_intro'       => setting('sec_exp_intro', 'The roles, responsibilities, and practical experience that have shaped my approach to IT.'),
+
+    // Dynamic Section 04: Projects
+    'sec_proj_kicker'     => setting('sec_proj_kicker', '04 / SELECTED WORK'),
+    'sec_proj_title'      => setting('sec_proj_title', 'Work that'),
+    'sec_proj_accent'     => setting('sec_proj_accent', 'matters.'),
+    'sec_proj_intro'      => setting('sec_proj_intro', 'Experience highlights and initiatives.'),
+
+    // Dynamic Section 05: Education
+    'sec_edu_kicker'      => setting('sec_edu_kicker', '05 / EDUCATION'),
+    'sec_edu_title'       => setting('sec_edu_title', 'Built on a'),
+    'sec_edu_accent'      => setting('sec_edu_accent', 'strong foundation.'),
+
+    // Dynamic Section 06: Contact
+    'sec_contact_kicker'  => setting('sec_contact_kicker', '06 / GET IN TOUCH'),
+    'sec_contact_title'   => setting('sec_contact_title', 'Have a challenge?'),
+    'sec_contact_accent'  => setting('sec_contact_accent', 'Let’s talk.'),
+    'sec_contact_intro'   => setting('sec_contact_intro', 'For IT support opportunities, collaboration, or a professional conversation, send me a message.'),
+
+    // Callout Badges
+    'learning_title'      => setting('learning_title', 'Currently growing'),
+    'learning_text'       => setting('learning_text', 'Microsoft 365 Administration · Microsoft Entra ID · Azure Administrator (AZ-104 path)'),
+    'edu_learning_title'  => setting('edu_learning_title', 'Building toward cloud & enterprise infrastructure'),
+    'edu_learning_text'   => setting('edu_learning_text', 'Focused on Microsoft 365, Entra ID, Azure administration, and lab-based deployments.')
 ];
 
 // Fetch Normalized Skills & Groups
@@ -221,7 +261,7 @@ $remainingName = implode(' ', $nameParts);
     <main>
         <section class="hero container" id="home">
             <div class="hero-copy">
-                <div class="availability"><span class="status-dot"></span> IT SUPPORT · OPERATIONS · INFRASTRUCTURE</div>
+                <div class="availability"><span class="status-dot"></span> <?= e($profile['availability_status']) ?></div>
                 <p class="eyebrow">HELLO, I'M</p>
                 <h1><?= e($firstName) ?><br><span><?= e($remainingName) ?>.</span></h1>
                 <p class="hero-role"><?= e($profile['role']) ?> <span class="role-divider">/</span> <?= e($profile['location']) ?></p>
@@ -235,6 +275,10 @@ $remainingName = implode(' ', $nameParts);
                 <div class="hero-socials">
                     <?php if ($profile['linkedin']): ?>
                         <a href="<?= e($profile['linkedin']) ?>" target="_blank" rel="noopener noreferrer">LinkedIn <span>↗</span></a>
+                    <?php endif; ?>
+                    <?php if (!empty($profile['github'])): ?>
+                        <span class="social-separator"></span>
+                        <a href="<?= e($profile['github']) ?>" target="_blank" rel="noopener noreferrer">GitHub <span>↗</span></a>
                     <?php endif; ?>
                     <span class="social-separator"></span>
                     <a href="#projects">Selected work <span>↘</span></a>
@@ -281,11 +325,12 @@ $remainingName = implode(' ', $nameParts);
             <a class="scroll-cue" href="#about"><span class="scroll-line"></span> SCROLL TO EXPLORE</a>
         </section>
 
+        <!-- 01 / ABOUT -->
         <section class="section about-section" id="about">
             <div class="container section-grid">
                 <div class="section-heading reveal">
-                    <p class="eyebrow">01 / ABOUT</p>
-                    <h2>Making technology<br><span>work for people.</span></h2>
+                    <p class="eyebrow"><?= e($profile['sec_about_kicker']) ?></p>
+                    <h2><?= e($profile['sec_about_title']) ?><br><span><?= e($profile['sec_about_accent']) ?></span></h2>
                 </div>
                 <div class="about-content reveal">
                     <p class="lead"><?= e($profile['headline']) ?></p>
@@ -293,20 +338,23 @@ $remainingName = implode(' ', $nameParts);
                     <div class="stat-grid">
                         <div class="stat"><strong>L1/L2</strong><span>End-user support</span></div>
                         <div class="stat"><strong>IT</strong><span>Support & operations</span></div>
-                        <div class="stat"><strong>4+</strong><span>Years experience</span></div>
+                        <div class="stat"><strong>4+</strong><span>Years in IT support roles</span></div>
                     </div>
                 </div>
             </div>
         </section>
 
+        <!-- 02 / TOOLKIT (SKILLS) -->
         <section class="section skills-section" id="skills">
             <div class="container">
                 <div class="section-heading section-heading-wide reveal">
                     <div>
-                        <p class="eyebrow">02 / TOOLKIT</p>
-                        <h2>Skills &amp; <span>strengths.</span></h2>
+                        <p class="eyebrow"><?= e($profile['sec_skills_kicker']) ?></p>
+                        <h2><?= e($profile['sec_skills_title']) ?> <span><?= e($profile['sec_skills_accent']) ?></span></h2>
                     </div>
-                    <p class="section-intro">A practical mix of end-user support, SaaS administration, IT operations, and cloud infrastructure.</p>
+                    <?php if (!empty($profile['sec_skills_intro'])): ?>
+                        <p class="section-intro"><?= e($profile['sec_skills_intro']) ?></p>
+                    <?php endif; ?>
                 </div>
                 <div class="skill-filters reveal">
                     <button class="filter-button active" data-filter="all">All skills</button>
@@ -339,14 +387,17 @@ $remainingName = implode(' ', $nameParts);
             </div>
         </section>
 
+        <!-- 03 / CAREER (EXPERIENCE) -->
         <section class="section experience-section" id="experience">
             <div class="container">
                 <div class="section-heading section-heading-wide reveal">
                     <div>
-                        <p class="eyebrow">03 / CAREER</p>
-                        <h2>Work <span>experience.</span></h2>
+                        <p class="eyebrow"><?= e($profile['sec_exp_kicker']) ?></p>
+                        <h2><?= e($profile['sec_exp_title']) ?> <span><?= e($profile['sec_exp_accent']) ?></span></h2>
                     </div>
-                    <p class="section-intro">Roles, duties, and practical problem solving across dynamic infrastructure environments.</p>
+                    <?php if (!empty($profile['sec_exp_intro'])): ?>
+                        <p class="section-intro"><?= e($profile['sec_exp_intro']) ?></p>
+                    <?php endif; ?>
                 </div>
                 <div class="timeline">
                     <?php foreach ($experience as $i => $job): ?>
@@ -400,14 +451,17 @@ $remainingName = implode(' ', $nameParts);
             </div>
         </section>
 
+        <!-- 04 / SELECTED WORK (PROJECTS) -->
         <section class="section projects-section" id="projects">
             <div class="container">
                 <div class="section-heading section-heading-wide reveal">
                     <div>
-                        <p class="eyebrow">04 / SELECTED WORK</p>
-                        <h2>Key <span>initiatives.</span></h2>
+                        <p class="eyebrow"><?= e($profile['sec_proj_kicker']) ?></p>
+                        <h2><?= e($profile['sec_proj_title']) ?> <span><?= e($profile['sec_proj_accent']) ?></span></h2>
                     </div>
-                    <p class="section-intro">Infrastructure upgrades, systems operations, and user workflow enhancements.</p>
+                    <?php if (!empty($profile['sec_proj_intro'])): ?>
+                        <p class="section-intro"><?= e($profile['sec_proj_intro']) ?></p>
+                    <?php endif; ?>
                 </div>
                 <div class="projects-grid">
                     <?php foreach ($projects as $i => $project): ?>
@@ -436,11 +490,12 @@ $remainingName = implode(' ', $nameParts);
             </div>
         </section>
 
+        <!-- 05 / EDUCATION -->
         <section class="section education-section" id="education">
             <div class="container section-grid">
                 <div class="section-heading reveal">
-                    <p class="eyebrow">05 / EDUCATION</p>
-                    <h2>Academic<br><span>background.</span></h2>
+                    <p class="eyebrow"><?= e($profile['sec_edu_kicker']) ?></p>
+                    <h2><?= e($profile['sec_edu_title']) ?><br><span><?= e($profile['sec_edu_accent']) ?></span></h2>
                 </div>
                 <div class="education-list">
                     <?php foreach ($education as $item): ?>
@@ -455,13 +510,13 @@ $remainingName = implode(' ', $nameParts);
                         </article>
                     <?php endforeach; ?>
 
-                    <?php if (!empty($profile['learning_text'])): ?>
+                    <?php if (!empty($profile['edu_learning_text'])): ?>
                         <div class="learning-card reveal">
                             <div class="learning-icon">◎</div>
                             <div>
                                 <p class="eyebrow">CONTINUOUS LEARNING</p>
-                                <h3><?= e($profile['learning_title'] ?: 'Building toward cloud & enterprise infrastructure') ?></h3>
-                                <p><?= e($profile['learning_text']) ?></p>
+                                <h3><?= e($profile['edu_learning_title']) ?></h3>
+                                <p><?= e($profile['edu_learning_text']) ?></p>
                             </div>
                         </div>
                     <?php endif; ?>
@@ -469,12 +524,13 @@ $remainingName = implode(' ', $nameParts);
             </div>
         </section>
 
+        <!-- 06 / GET IN TOUCH (CONTACT) -->
         <section class="section contact-section" id="contact">
             <div class="container contact-layout">
                 <div class="contact-copy reveal">
-                    <p class="eyebrow">06 / GET IN TOUCH</p>
-                    <h2>Have an opening?<br><span>Let’s connect.</span></h2>
-                    <p>For IT support opportunities, systems administration, or project collaboration, send me a note.</p>
+                    <p class="eyebrow"><?= e($profile['sec_contact_kicker']) ?></p>
+                    <h2><?= e($profile['sec_contact_title']) ?><br><span><?= e($profile['sec_contact_accent']) ?></span></h2>
+                    <p><?= e($profile['sec_contact_intro']) ?></p>
 
                     <?php if ($profile['linkedin']): ?>
                         <a class="contact-link" href="<?= e($profile['linkedin']) ?>" target="_blank" rel="noopener noreferrer">

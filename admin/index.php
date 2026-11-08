@@ -86,24 +86,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         redirect('admin/profile');
     }
 
-    // Global Site Settings Handler
+    // Global Site Settings & Section Headers Handler
     if ($action === 'save_site_settings') {
         $keys = [
             'headline',
             'intro',
+            'availability_status',
+            'github',
+            'sec_about_kicker',
+            'sec_about_title',
+            'sec_about_accent',
+            'sec_skills_kicker',
+            'sec_skills_title',
+            'sec_skills_accent',
+            'sec_skills_intro',
+            'sec_exp_kicker',
+            'sec_exp_title',
+            'sec_exp_accent',
+            'sec_exp_intro',
+            'sec_proj_kicker',
+            'sec_proj_title',
+            'sec_proj_accent',
+            'sec_proj_intro',
+            'sec_edu_kicker',
+            'sec_edu_title',
+            'sec_edu_accent',
+            'sec_contact_kicker',
+            'sec_contact_title',
+            'sec_contact_accent',
+            'sec_contact_intro',
             'learning_title',
             'learning_text',
             'edu_learning_title',
-            'edu_learning_text',
-            'availability_status',
-            'github'
+            'edu_learning_text'
         ];
 
         foreach ($keys as $key) {
             set_setting($key, trim((string)($_POST[$key] ?? '')));
         }
 
-        flash('success', 'Site settings updated successfully.');
+        flash('success', 'Site settings and section copy updated successfully.');
         redirect('admin/settings');
     }
 
@@ -208,7 +230,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 redirect("admin/content/experience" . ($id ? "?edit={$id}" : '?new=1'));
             }
 
-            // Inherit company and location if linked as an internal promotion
             if ($parentId !== null) {
                 $pStmt = $pdo->prepare('SELECT company, location FROM experience WHERE id = ?');
                 $pStmt->execute([$parentId]);
@@ -379,18 +400,40 @@ if ($page === 'profile') {
     exit;
 }
 
-// Site Settings View
+// Site Settings View (Hero, Section Headers, Subtitles, Callout Badges)
 if ($page === 'settings') {
     $title = 'Site Settings';
     $settingKeys = [
         'headline',
         'intro',
+        'availability_status',
+        'github',
+        'sec_about_kicker',
+        'sec_about_title',
+        'sec_about_accent',
+        'sec_skills_kicker',
+        'sec_skills_title',
+        'sec_skills_accent',
+        'sec_skills_intro',
+        'sec_exp_kicker',
+        'sec_exp_title',
+        'sec_exp_accent',
+        'sec_exp_intro',
+        'sec_proj_kicker',
+        'sec_proj_title',
+        'sec_proj_accent',
+        'sec_proj_intro',
+        'sec_edu_kicker',
+        'sec_edu_title',
+        'sec_edu_accent',
+        'sec_contact_kicker',
+        'sec_contact_title',
+        'sec_contact_accent',
+        'sec_contact_intro',
         'learning_title',
         'learning_text',
         'edu_learning_title',
-        'edu_learning_text',
-        'availability_status',
-        'github'
+        'edu_learning_text'
     ];
     $settings = [];
     foreach ($settingKeys as $k) {
@@ -576,7 +619,7 @@ require __DIR__ . '/views/header.php';
     <div class="admin-panel quick-links">
         <h2>Quick Shortcuts</h2>
         <a href="<?= e(url('admin/profile')) ?>">◉ &nbsp; Update profile &amp; photo <span>↗</span></a>
-        <a href="<?= e(url('admin/settings')) ?>">🎛 &nbsp; Global site &amp; learning copy <span>↗</span></a>
+        <a href="<?= e(url('admin/settings')) ?>">🎛 &nbsp; Global site &amp; section copy <span>↗</span></a>
         <a href="<?= e(url('admin/content/skills')) ?>">✳ &nbsp; Edit skills <span>↗</span></a>
         <a href="<?= e(url('admin/content/experience')) ?>">▤ &nbsp; Update work experience <span>↗</span></a>
         <a href="<?= e(url('admin/content/projects')) ?>">◇ &nbsp; Manage projects <span>↗</span></a>
