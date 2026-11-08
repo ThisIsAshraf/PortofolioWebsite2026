@@ -7,6 +7,7 @@ require_once __DIR__ . '/config.php';
 use PHPMailer\PHPMailer\PHPMailer;
 
 $pdo = db();
+record_visit();
 
 // Handle Contact Form Submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'contact') {
@@ -327,18 +328,20 @@ $remainingName = implode(' ', $nameParts);
 
         <!-- 01 / ABOUT -->
         <section class="section about-section" id="about">
-            <div class="container section-grid">
-                <div class="section-heading reveal">
-                    <p class="eyebrow"><?= e($profile['sec_about_kicker']) ?></p>
-                    <h2><?= e($profile['sec_about_title']) ?><br><span><?= e($profile['sec_about_accent']) ?></span></h2>
-                </div>
-                <div class="about-content reveal">
-                    <p class="lead"><?= e($profile['headline']) ?></p>
-                    <p><?= e($profile['intro']) ?></p>
-                    <div class="stat-grid">
-                        <div class="stat"><strong>L1/L2</strong><span>End-user support</span></div>
-                        <div class="stat"><strong>IT</strong><span>Support & operations</span></div>
-                        <div class="stat"><strong>4+</strong><span>Years in IT support roles</span></div>
+            <div class="container">
+                <div class="section-grid">
+                    <div class="section-heading reveal">
+                        <p class="eyebrow"><?= e($profile['sec_about_kicker']) ?></p>
+                        <h2><?= e($profile['sec_about_title']) ?><br><span><?= e($profile['sec_about_accent']) ?></span></h2>
+                    </div>
+                    <div class="about-content reveal">
+                        <p class="lead"><?= e($profile['headline']) ?></p>
+                        <p><?= e($profile['intro']) ?></p>
+                        <div class="stat-grid">
+                            <div class="stat"><strong>L1/L2</strong><span>End-user support</span></div>
+                            <div class="stat"><strong>IT</strong><span>Support & operations</span></div>
+                            <div class="stat"><strong>4+</strong><span>Years in IT support roles</span></div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -429,7 +432,7 @@ $remainingName = implode(' ', $nameParts);
                                         </div>
                                         <?php foreach ($childRoles[(int)$job['id']] as $subRole): ?>
                                             <div class="promotion-subitem" style="margin-bottom: 1rem; padding-left: 0.85rem; border-left: 2px solid #0284c7;">
-                                                <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 0.35rem;">
+                                                <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 0.35rem; flex-wrap: wrap; gap: 0.25rem;">
                                                     <h4 style="font-size: 1.05rem; margin: 0; color: #cbd5e1; font-weight: 600;">
                                                         <?= e($subRole['role']) ?>
                                                     </h4>
@@ -492,112 +495,116 @@ $remainingName = implode(' ', $nameParts);
 
         <!-- 05 / EDUCATION -->
         <section class="section education-section" id="education">
-            <div class="container section-grid">
-                <div class="section-heading reveal">
-                    <p class="eyebrow"><?= e($profile['sec_edu_kicker']) ?></p>
-                    <h2><?= e($profile['sec_edu_title']) ?><br><span><?= e($profile['sec_edu_accent']) ?></span></h2>
-                </div>
-                <div class="education-list">
-                    <?php foreach ($education as $item): ?>
-                        <article class="education-card reveal">
-                            <div class="education-icon">↗</div>
-                            <div>
-                                <p class="education-period"><?= e($item['period']) ?></p>
-                                <h3><?= e($item['degree']) ?></h3>
-                                <p class="education-institution"><?= e($item['institution']) ?></p>
-                                <p class="education-detail"><?= e($item['detail'] ?? '') ?></p>
-                            </div>
-                        </article>
-                    <?php endforeach; ?>
+            <div class="container">
+                <div class="section-grid">
+                    <div class="section-heading reveal">
+                        <p class="eyebrow"><?= e($profile['sec_edu_kicker']) ?></p>
+                        <h2><?= e($profile['sec_edu_title']) ?><br><span><?= e($profile['sec_edu_accent']) ?></span></h2>
+                    </div>
+                    <div class="education-list">
+                        <?php foreach ($education as $item): ?>
+                            <article class="education-card reveal">
+                                <div class="education-icon">↗</div>
+                                <div>
+                                    <p class="education-period"><?= e($item['period']) ?></p>
+                                    <h3><?= e($item['degree']) ?></h3>
+                                    <p class="education-institution"><?= e($item['institution']) ?></p>
+                                    <p class="education-detail"><?= e($item['detail'] ?? '') ?></p>
+                                </div>
+                            </article>
+                        <?php endforeach; ?>
 
-                    <?php if (!empty($profile['edu_learning_text'])): ?>
-                        <div class="learning-card reveal">
-                            <div class="learning-icon">◎</div>
-                            <div>
-                                <p class="eyebrow">CONTINUOUS LEARNING</p>
-                                <h3><?= e($profile['edu_learning_title']) ?></h3>
-                                <p><?= e($profile['edu_learning_text']) ?></p>
+                        <?php if (!empty($profile['edu_learning_text'])): ?>
+                            <div class="learning-card reveal">
+                                <div class="learning-icon">◎</div>
+                                <div>
+                                    <p class="eyebrow">CONTINUOUS LEARNING</p>
+                                    <h3><?= e($profile['edu_learning_title']) ?></h3>
+                                    <p><?= e($profile['edu_learning_text']) ?></p>
+                                </div>
                             </div>
-                        </div>
-                    <?php endif; ?>
+                        <?php endif; ?>
+                    </div>
                 </div>
             </div>
         </section>
 
         <!-- 06 / GET IN TOUCH (CONTACT) -->
         <section class="section contact-section" id="contact">
-            <div class="container contact-layout">
-                <div class="contact-copy reveal">
-                    <p class="eyebrow"><?= e($profile['sec_contact_kicker']) ?></p>
-                    <h2><?= e($profile['sec_contact_title']) ?><br><span><?= e($profile['sec_contact_accent']) ?></span></h2>
-                    <p><?= e($profile['sec_contact_intro']) ?></p>
+            <div class="container">
+                <div class="contact-layout">
+                    <div class="contact-copy reveal">
+                        <p class="eyebrow"><?= e($profile['sec_contact_kicker']) ?></p>
+                        <h2><?= e($profile['sec_contact_title']) ?><br><span><?= e($profile['sec_contact_accent']) ?></span></h2>
+                        <p><?= e($profile['sec_contact_intro']) ?></p>
 
-                    <?php if ($profile['linkedin']): ?>
-                        <a class="contact-link" href="<?= e($profile['linkedin']) ?>" target="_blank" rel="noopener noreferrer">
-                            <span class="contact-link-icon">in</span>
-                            <span><small>CONNECT ON</small><strong>LinkedIn</strong></span>
-                            <span class="contact-arrow">↗</span>
-                        </a>
-                    <?php endif; ?>
-                    <?php if ($profile['email']): ?>
-                        <a class="contact-link" href="mailto:<?= e($profile['email']) ?>">
-                            <span class="contact-link-icon">@</span>
-                            <span><small>EMAIL ME</small><strong><?= e($profile['email']) ?></strong></span>
-                            <span class="contact-arrow">↗</span>
-                        </a>
-                    <?php endif; ?>
-                    <?php if ($profile['phone']): ?>
-                        <a class="contact-link" href="tel:<?= e(preg_replace('/[^0-9+]/', '', $profile['phone'])) ?>">
-                            <span class="contact-link-icon">☎</span>
-                            <span><small>CALL ME</small><strong><?= e($profile['phone']) ?></strong></span>
-                            <span class="contact-arrow">↗</span>
-                        </a>
-                    <?php endif; ?>
+                        <?php if ($profile['linkedin']): ?>
+                            <a class="contact-link" href="<?= e($profile['linkedin']) ?>" target="_blank" rel="noopener noreferrer">
+                                <span class="contact-link-icon">in</span>
+                                <span><small>CONNECT ON</small><strong>LinkedIn</strong></span>
+                                <span class="contact-arrow">↗</span>
+                            </a>
+                        <?php endif; ?>
+                        <?php if ($profile['email']): ?>
+                            <a class="contact-link" href="mailto:<?= e($profile['email']) ?>">
+                                <span class="contact-link-icon">@</span>
+                                <span><small>EMAIL ME</small><strong><?= e($profile['email']) ?></strong></span>
+                                <span class="contact-arrow">↗</span>
+                            </a>
+                        <?php endif; ?>
+                        <?php if ($profile['phone']): ?>
+                            <a class="contact-link" href="tel:<?= e(preg_replace('/[^0-9+]/', '', $profile['phone'])) ?>">
+                                <span class="contact-link-icon">☎</span>
+                                <span><small>CALL ME</small><strong><?= e($profile['phone']) ?></strong></span>
+                                <span class="contact-arrow">↗</span>
+                            </a>
+                        <?php endif; ?>
 
-                    <div class="contact-location"><span class="status-dot"></span> Located in <?= e($profile['location']) ?></div>
-                </div>
-
-                <div class="contact-form-wrap reveal">
-                    <div class="form-header"><span>INQUIRY FORM</span><span class="form-asterisk">✳</span></div>
-
-                    <div id="formAlertBox">
-                        <?php foreach ($flashes as $f): ?>
-                            <div class="flash flash-<?= e($f['type']) ?>" role="status"><?= e($f['message']) ?></div>
-                        <?php endforeach; ?>
+                        <div class="contact-location"><span class="status-dot"></span> Located in <?= e($profile['location']) ?></div>
                     </div>
 
-                    <form action="<?= e(url('index.php')) ?>" method="post" id="contactForm">
-                        <input type="hidden" name="action" value="contact">
-                        <input type="hidden" name="csrf_token" id="csrfTokenField" value="<?= e(csrf_token()) ?>">
+                    <div class="contact-form-wrap reveal">
+                        <div class="form-header"><span>MESSAGE / 001</span><span class="form-asterisk">✳</span></div>
 
-                        <!-- Anti-bot Honeypot Field -->
-                        <div class="honeypot" aria-hidden="true" style="display:none !important;">
-                            <label for="website">Leave blank</label>
-                            <input id="website" name="website" tabindex="-1" autocomplete="off">
+                        <div id="formAlertBox">
+                            <?php foreach ($flashes as $f): ?>
+                                <div class="flash flash-<?= e($f['type']) ?>" role="status"><?= e($f['message']) ?></div>
+                            <?php endforeach; ?>
                         </div>
 
-                        <div class="form-row">
-                            <label for="name">Your Name <span>*</span>
-                                <input id="name" name="name" type="text" placeholder="Jane Doe" maxlength="120" required>
+                        <form action="<?= e(url('index.php')) ?>" method="post" id="contactForm">
+                            <input type="hidden" name="action" value="contact">
+                            <input type="hidden" name="csrf_token" id="csrfTokenField" value="<?= e(csrf_token()) ?>">
+
+                            <!-- Anti-bot Honeypot Field -->
+                            <div class="honeypot" aria-hidden="true" style="display:none !important;">
+                                <label for="website">Leave blank</label>
+                                <input id="website" name="website" tabindex="-1" autocomplete="off">
+                            </div>
+
+                            <div class="form-row">
+                                <label for="name">Your name <span>*</span>
+                                    <input id="name" name="name" type="text" placeholder="Jane Smith" maxlength="120" required>
+                                </label>
+                                <label for="email">Email address <span>*</span>
+                                    <input id="email" name="email" type="email" placeholder="jane@example.com" maxlength="254" required>
+                                </label>
+                            </div>
+                            <label for="subject">Subject
+                                <input id="subject" name="subject" type="text" placeholder="What would you like to discuss?" maxlength="180">
                             </label>
-                            <label for="email">Email Address <span>*</span>
-                                <input id="email" name="email" type="email" placeholder="jane@example.com" maxlength="254" required>
+                            <label for="message">Your message <span>*</span>
+                                <textarea id="message" name="message" rows="5" maxlength="5000" placeholder="Write your message here..." required></textarea>
                             </label>
-                        </div>
-                        <label for="subject">Subject
-                            <input id="subject" name="subject" type="text" placeholder="Opportunity / Consultation" maxlength="180">
-                        </label>
-                        <label for="message">Message <span>*</span>
-                            <textarea id="message" name="message" rows="5" maxlength="5000" placeholder="How can I assist your team?" required></textarea>
-                        </label>
-                        <div class="form-bottom">
-                            <p><span>*</span> Required fields</p>
-                            <button class="button button-primary submit-button" id="submitBtn" type="submit">
-                                <span class="btn-text">Send message</span> <span>↗</span>
-                            </button>
-                        </div>
-                        <p class="privacy-note">Messages are received directly into my inbox and admin panel.</p>
-                    </form>
+                            <div class="form-bottom">
+                                <p><span>*</span> Required fields</p>
+                                <button class="button button-primary submit-button" id="submitBtn" type="submit">
+                                    <span class="btn-text">Send message</span> <span>↗</span>
+                                </button>
+                            </div>
+                            <p class="privacy-note">Your message is stored for follow-up. Please avoid sending sensitive personal information.</p>
+                        </form>
+                    </div>
                 </div>
             </div>
         </section>
@@ -605,8 +612,10 @@ $remainingName = implode(' ', $nameParts);
 
     <footer class="site-footer">
         <div class="container footer-inner">
-            <a class="brand" href="#top"><span class="brand-mark">S.</span><span>SHIHAB<span class="brand-dot">/</span></span></a>
-            <p>Designed with purpose. Built to keep systems moving.</p>
+            <div style="display: flex; align-items: center; gap: 14px;">
+                <a class="brand" href="#top"><span class="brand-mark">S.</span><span>SHIHAB<span class="brand-dot">/</span></span></a>
+                <p>Designed with purpose. Built to keep systems moving.</p>
+            </div>
             <a href="#top" class="back-top">BACK TO TOP ↑</a>
             <span class="copyright">&copy; <?= date('Y') ?> <?= e($profile['name']) ?></span>
             <a class="admin-footer-link" href="<?= e(url('admin/login')) ?>">Admin</a>

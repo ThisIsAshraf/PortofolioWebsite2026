@@ -309,3 +309,76 @@ function save_smtp_config(array $data): void
         ':is_active'  => !empty($data['is_active']) ? 1 : 0
     ]);
 }
+
+// 12. Visitor Tracking Engine
+function record_visit(): void
+{
+    // Skip recording admin sessions or AJAX calls to avoid polluters
+    // if (!empty($_SESSION['admin_id'])) {
+    //  return;
+    //}
+
+    $isAjax = (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest')
+        || (isset($_SERVER['HTTP_ACCEPT']) && str_contains($_SERVER['HTTP_ACCEPT'], 'application/json'));
+    if ($isAjax) {
+        return;
+    }
+
+    $ip = $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
+    if (!empty($_SERVER['HTTP_CF_CONNECTING_IP'])) {
+        $ip = $_SERVER['HTTP_CF_CONNECTING_IP'];
+    } elseif (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
+        $ip = trim(explode(',', $_SERVER['HTTP_X_FORWARDED_FOR'])[0]);
+    }
+
+    $ua = $_SERVER['HTTP_USER_AGENT'] ?? '';
+
+    // Ignore Common Web Crawlers
+    if (preg_match('/bot|crawl|slurp|spider|mediapartners/i', $ua)) {
+        return;
+    }
+
+    $device = 'Desktop';
+    if (preg_match('/tablet|ipad|playbook|silk/i', $ua)) {
+        $device = 'Tablet';
+    } elseif (preg_match('/mobile|iphone|ipod|android|blackberry|opera mini|iemobile/i', $ua)) {
+        $device = 'Mobile';
+    }
+
+    $browser = 'Other';
+    if (preg_match('/edg/i', $ua)) $browser = 'Edge';
+    elseif (preg_match('/chrome/i', $ua)) $browser = 'Chrome';
+    elseif (preg_match('/safari/i', $ua)) $browser = 'Safari';
+    elseif (preg_match('/firefox/i', $ua)) $browser = 'Firefox';
+    elseif (preg_match('/opera|opr/i', $ua)) $browser = 'Opera';
+
+    $platform = 'Other';
+    if (preg_match('/windows/i', $ua)) $platform = 'Windows';
+    elseif (preg_match('/android/i', $ua)) $platform = 'Android';
+    elseif (preg_match('/iphone|ipad|ipod/i', $ua)) $platform = 'iOS';
+    elseif (preg_match('/macintosh|mac os x/i', $ua)) $platform = 'macOS';
+    elseif (preg_match('/linux/i', $ua)) $platform = 'Linux';
+
+    $country = 'Localhost / Intranet';
+    $city = 'Internal';
+    if ($ip !== '127.0.0.1' && !str_starts_with($ip, '192.168.') && !str_starts_with($ip, '10.')) {
+        if (!empty($_SERVER['HTTP_CF_IPCOUNTRY'])) {
+            $country = $_SERVER['HTTP_CF_IPCOUNTRY'];
+        }
+    }
+
+    $sessionId = session_id();
+    $pageUrl = $_SERVER['REQUEST_URI'] ?? '/';
+    $referrer = $_SERVER['HTTP_REFERER'] ?? null;
+
+    try {
+        $stmt = db()->prepare('
+            INSERT INTO visitor_logs 
+                (session_id, ip_address, user_agent, device_type, browser, platform, country, city, page_url, referrer) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ');
+        $stmt->execute([$sessionId, $ip, $ua, $device, $browser, $platform, $country, $city, $pageUrl, $referrer]);
+    } catch (\Throwable $e) {
+        error_log('Tracking error: ' . $e->getMessage());
+    }
+}

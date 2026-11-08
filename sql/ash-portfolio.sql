@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Nov 08, 2026 at 12:38 PM
+-- Generation Time: Nov 08, 2026 at 02:54 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -44,6 +44,22 @@ INSERT INTO `admin_users` (`id`, `username`, `password_hash`, `created_at`) VALU
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `click_logs`
+--
+
+CREATE TABLE `click_logs` (
+  `id` bigint(20) UNSIGNED NOT NULL,
+  `session_id` varchar(64) NOT NULL,
+  `ip_address` varchar(45) NOT NULL,
+  `element_id` varchar(100) DEFAULT NULL,
+  `element_text` varchar(150) DEFAULT NULL,
+  `target_url` varchar(255) NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `contact_messages`
 --
 
@@ -62,7 +78,7 @@ CREATE TABLE `contact_messages` (
 --
 
 INSERT INTO `contact_messages` (`id`, `name`, `email`, `subject`, `message`, `created_at`, `status`) VALUES
-(1, 'Ashraful Alam Shihab', 'alamshihab526@gmail.com', 'sdsdss', 'ssssssssssssssss', '2026-11-08 11:34:54', 'new');
+(1, 'Ashraful Alam Shihab', 'alamshihab526@gmail.com', 'System Mail', 'bkllhbkllbnlllllllll', '2026-11-08 12:44:30', 'read');
 
 -- --------------------------------------------------------
 
@@ -86,7 +102,7 @@ CREATE TABLE `education` (
 --
 
 INSERT INTO `education` (`id`, `degree`, `institution`, `period`, `detail`, `sort_order`, `is_visible`, `created_at`) VALUES
-(1, 'Bachelor of Science in Information Technology', 'Limkokwing University of Creative Technology', '2019 – 2021', 'Cyberjaya, Selangor, Malaysia · CGPA: 3.91 / 4.00', 1, 1, '2026-11-08 10:20:04');
+(1, 'Bachelor of Science in Information Technology', 'Limkokwing University of Creative Technology', 'Feb 2019 – Dec 2021', 'Cyberjaya, Selangor, Malaysia ·', 0, 1, '2026-11-08 12:26:49');
 
 -- --------------------------------------------------------
 
@@ -96,6 +112,7 @@ INSERT INTO `education` (`id`, `degree`, `institution`, `period`, `detail`, `sor
 
 CREATE TABLE `experience` (
   `id` int(10) UNSIGNED NOT NULL,
+  `parent_id` int(10) UNSIGNED DEFAULT NULL,
   `role` varchar(180) NOT NULL,
   `company` varchar(180) NOT NULL,
   `period` varchar(100) NOT NULL,
@@ -109,12 +126,10 @@ CREATE TABLE `experience` (
 -- Dumping data for table `experience`
 --
 
-INSERT INTO `experience` (`id`, `role`, `company`, `period`, `location`, `sort_order`, `is_visible`, `created_at`) VALUES
-(1, 'Senior Desktop Support Engineer', 'Noor Staffing Group', 'Mar 2026 – Present', 'Bangladesh', 1, 1, '2026-11-08 11:14:21'),
-(2, 'Desktop Support Specialist', 'Noor Staffing Group', 'Oct 2024 – Feb 2026', 'Bangladesh', 2, 1, '2026-11-08 11:14:21'),
-(3, 'Technical Support Advisor', 'Amber Software Solutions', 'Feb 2023 – Sep 2024', 'Remote / UK customers', 3, 1, '2026-11-08 11:14:21'),
-(4, 'IT Support Engineer', 'Flyte Solutions Ltd', 'Nov 2021 – Jan 2023', 'Bangladesh', 4, 1, '2026-11-08 11:14:21'),
-(5, 'Junior Back-End Developer Intern', 'JomRun Sdn Bhd', 'Oct 2021 – Dec 2021', 'Malaysia', 5, 1, '2026-11-08 11:14:21');
+INSERT INTO `experience` (`id`, `parent_id`, `role`, `company`, `period`, `location`, `sort_order`, `is_visible`, `created_at`) VALUES
+(1, NULL, 'Desktop Support Specialist', 'Noor Staffing Group', 'Oct 2024 – Feb 2026', 'Bangladesh', 2, 1, '2026-11-08 12:08:47'),
+(2, NULL, 'Senior Desktop Support Engineer', 'Noor Staffing Group', 'Mar 2026 – Present', 'Bangladesh', 1, 1, '2026-11-08 12:10:10'),
+(3, NULL, 'Technical Support Advisor', 'Amber Software Solutions', 'Feb 2023 – Sep 2024', 'Dhaka, Bangladesh', 3, 1, '2026-11-08 12:22:39');
 
 -- --------------------------------------------------------
 
@@ -134,24 +149,20 @@ CREATE TABLE `experience_responsibilities` (
 --
 
 INSERT INTO `experience_responsibilities` (`id`, `experience_id`, `responsibility`, `sort_order`) VALUES
-(1, 1, 'Provide L1/L2 support for end-user devices, software, peripherals, connectivity, and business applications.', 1),
-(2, 1, 'Manage incidents and service requests through Zendesk.', 2),
-(3, 1, 'Administer Google Workspace accounts, groups, permissions, mailboxes, and license allocation.', 3),
-(4, 1, 'Manage RingCentral users and support LinkedIn and Indeed user administration.', 4),
-(5, 1, 'Coordinate onboarding/offboarding, IT assets, purchasing, quotations, and vendor follow-up.', 5),
-(6, 1, 'Supported the successful Bangladesh office network migration from Cat5 to Cat6.', 6),
-(7, 2, 'Delivered desktop and end-user support for hardware, software, printers, applications, and connectivity.', 1),
-(8, 2, 'Managed incidents and service requests using Jira Service Management.', 2),
-(9, 2, 'Supported Google Workspace administration, onboarding, account setup, and access management.', 3),
-(10, 2, 'Maintained IT asset records and supported workstation deployment.', 4),
-(11, 3, 'Supported customers by phone, email, and remote sessions.', 1),
-(12, 3, 'Troubleshot technical, application, hardware, software, and connectivity issues.', 2),
-(13, 3, 'Assisted with Outlook configuration and email maintenance.', 3),
-(14, 3, 'Contributed web portal updates using HTML, CSS, JavaScript, and core PHP.', 4),
-(15, 4, 'Supported desktops, laptops, operating systems, printers, peripherals, email, and network connectivity.', 1),
-(16, 4, 'Assisted with user accounts, shared resources, workstation deployment, upgrades, and maintenance.', 2),
-(17, 4, 'Documented common support procedures and helped users with workplace technology.', 3),
-(18, 5, 'Completed a short back-end development internship and gained exposure to software development workflows.', 1);
+(71, 1, 'Delivered desktop and end-user support for hardware, software, printers, applications, and connectivity.', 1),
+(72, 1, 'Managed incidents and service requests using Jira Service Management.', 2),
+(73, 1, 'Supported Google Workspace administration, onboarding, account setup, and access management.', 3),
+(74, 1, 'Maintained IT asset records and supported workstation deployment.', 4),
+(75, 2, 'Provide L1/L2 support for end-user devices, software, peripherals, connectivity, and business applications.', 1),
+(76, 2, 'Manage incidents and service requests through Zendesk.', 2),
+(77, 2, 'Administer Google Workspace accounts, groups, permissions, mailboxes, and license allocation.', 3),
+(78, 2, 'Manage RingCentral users and support LinkedIn and Indeed user administration.', 4),
+(79, 2, 'Coordinate onboarding/offboarding, IT assets, purchasing, quotations, and vendor follow-up.', 5),
+(80, 2, 'Supported the successful Bangladesh office network migration from Cat5 to Cat6.', 6),
+(85, 3, 'Supported customers by phone, email, and remote sessions.', 1),
+(86, 3, 'Troubleshot technical, application, hardware, software, and connectivity issues.', 2),
+(87, 3, 'Assisted with Outlook configuration and email maintenance.', 3),
+(88, 3, 'Contributed web portal updates using HTML, CSS, JavaScript, and core PHP.', 4);
 
 -- --------------------------------------------------------
 
@@ -174,9 +185,7 @@ CREATE TABLE `projects` (
 --
 
 INSERT INTO `projects` (`id`, `title`, `project_type`, `description`, `sort_order`, `is_visible`, `created_at`) VALUES
-(1, 'Office Network Migration', 'Infrastructure · Networking', 'Supported the Bangladesh office migration from Cat5 to Cat6 cabling, coordinating implementation activities and helping deliver a successful upgrade.', 1, 1, '2026-11-08 11:14:21'),
-(2, 'Google Workspace Administration', 'SaaS · IT Operations', 'Manage mailbox and account requirements, groups, permissions, and license allocation with attention to access needs and cost-conscious administration.', 2, 1, '2026-11-08 11:14:21'),
-(3, 'Service Desk & Asset Operations', 'Support · Operations', 'Support ticket workflows, onboarding/offboarding, equipment allocation, inventory records, purchasing, and vendor follow-up.', 3, 1, '2026-11-08 11:14:21');
+(1, 'Office Network Migration', 'Infrastructure · Networking', 'Supported the Bangladesh office migration from Cat5 to Cat6 cabling, coordinating implementation activities and helping deliver a successful upgrade.', 0, 1, '2026-11-08 12:25:35');
 
 -- --------------------------------------------------------
 
@@ -197,13 +206,7 @@ CREATE TABLE `project_tags` (
 INSERT INTO `project_tags` (`id`, `project_id`, `tag_name`) VALUES
 (1, 1, 'Cat6 Cabling'),
 (2, 1, 'Coordination'),
-(3, 1, 'Office Infrastructure'),
-(4, 2, 'Google Workspace'),
-(5, 2, 'Licensing'),
-(6, 2, 'Access Management'),
-(7, 3, 'Zendesk'),
-(8, 3, 'IT Assets'),
-(9, 3, 'Procurement');
+(3, 1, 'Office Infrastructure');
 
 -- --------------------------------------------------------
 
@@ -221,15 +224,43 @@ CREATE TABLE `site_settings` (
 --
 
 INSERT INTO `site_settings` (`setting_key`, `setting_value`) VALUES
+('availability_status', 'IT SUPPORT · OPERATIONS · INFRASTRUCTURE'),
+('edu_learning_text', 'Focused on Microsoft 365, Entra ID, Azure administration, and lab-based deployments.'),
+('edu_learning_title', 'Building toward cloud & enterprise infrastructure'),
 ('email', 'meet.ashraf.uk@gmail.com'),
+('github', 'https://github.com/ashraful98'),
 ('headline', 'IT support, systems administration, and reliable technology experiences.'),
 ('intro', 'I help people and teams work confidently with technology—from end-user support and SaaS administration to IT assets, vendor coordination, and office infrastructure.'),
+('learning_text', ''),
+('learning_title', ''),
 ('linkedin', 'https://www.linkedin.com/in/ashraful98/'),
 ('location', 'Dhaka, Bangladesh'),
-('name', 'Shihab'),
+('name', 'Ashraful Alam Shihab'),
 ('phone', '01982401992'),
-('photo', 'profile_1e9051013ce29b6d.jpg'),
-('role', 'Senior Desktop Support Engineer');
+('photo', 'profile_fe1567c7ace17621.png'),
+('role', 'Senior Desktop Support Engineer'),
+('sec_about_accent', 'work for people.'),
+('sec_about_kicker', '01 / ABOUT'),
+('sec_about_title', 'Making technology'),
+('sec_contact_accent', 'Let’s talk.'),
+('sec_contact_intro', 'For IT support opportunities, collaboration, or a professional conversation, send me a message.'),
+('sec_contact_kicker', '06 / GET IN TOUCH'),
+('sec_contact_title', 'Have a challenge?'),
+('sec_edu_accent', 'strong foundation.'),
+('sec_edu_kicker', '05 / EDUCATION'),
+('sec_edu_title', 'Built on a'),
+('sec_exp_accent', 'experience.'),
+('sec_exp_intro', 'The roles, responsibilities, and practical experience that have shaped my approach to IT.'),
+('sec_exp_kicker', '03 / CAREER'),
+('sec_exp_title', 'Work'),
+('sec_proj_accent', 'matters.'),
+('sec_proj_intro', 'Experience highlights and initiatives.'),
+('sec_proj_kicker', '04 / SELECTED WORK'),
+('sec_proj_title', 'Work that'),
+('sec_skills_accent', 'strengths.'),
+('sec_skills_intro', 'A practical mix of user support, SaaS administration, IT operations, and developing infrastructure skills.'),
+('sec_skills_kicker', '02 / TOOLKIT'),
+('sec_skills_title', 'Skills &');
 
 -- --------------------------------------------------------
 
@@ -252,16 +283,7 @@ CREATE TABLE `skills` (
 --
 
 INSERT INTO `skills` (`id`, `group_id`, `name`, `level`, `sort_order`, `is_visible`, `created_at`) VALUES
-(1, 1, 'L1/L2 Technical Support', 'Core', 1, 1, '2026-11-08 11:14:21'),
-(2, 1, 'Service Desk & Ticketing', 'Core', 2, 1, '2026-11-08 11:14:21'),
-(3, 1, 'Hardware & Software Troubleshooting', 'Core', 3, 1, '2026-11-08 11:14:21'),
-(4, 2, 'Google Workspace Administration', 'Core', 4, 1, '2026-11-08 11:14:21'),
-(5, 2, 'Mailbox & License Management', 'Core', 5, 1, '2026-11-08 11:14:21'),
-(6, 3, 'IT Asset Management', 'Core', 6, 1, '2026-11-08 11:14:21'),
-(7, 3, 'IT Procurement & Vendor Coordination', 'Core', 7, 1, '2026-11-08 11:14:21'),
-(8, 4, 'TCP/IP, DNS & LAN/WAN', 'Working knowledge', 8, 1, '2026-11-08 11:14:21'),
-(9, 5, 'Microsoft 365 & Entra ID', 'Currently developing', 9, 1, '2026-11-08 11:14:21'),
-(10, 5, 'Microsoft Azure (AZ-104 path)', 'Currently developing', 10, 1, '2026-11-08 11:14:21');
+(1, 1, 'L1/L2 IT & Desktop Support', 'Core', 0, 1, '2026-11-08 11:43:16');
 
 -- --------------------------------------------------------
 
@@ -280,11 +302,7 @@ CREATE TABLE `skill_groups` (
 --
 
 INSERT INTO `skill_groups` (`id`, `name`, `sort_order`) VALUES
-(1, 'Support', 1),
-(2, 'Administration', 2),
-(3, 'Operations', 3),
-(4, 'Networking', 4),
-(5, 'Learning', 5);
+(1, 'Support', 0);
 
 -- --------------------------------------------------------
 
@@ -312,6 +330,36 @@ CREATE TABLE `smtp_settings` (
 INSERT INTO `smtp_settings` (`id`, `host`, `port`, `encryption`, `username`, `password`, `from_email`, `from_name`, `is_active`, `updated_at`) VALUES
 (1, 'smtp.gmail.com', 587, 'tls', 'alam.office.my@gmail.com', 'cbkk hghv ybom dooq', 'alam.office.my@gmail.com', 'Ashraful Portfolio', 1, '2026-11-08 11:26:50');
 
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `visitor_logs`
+--
+
+CREATE TABLE `visitor_logs` (
+  `id` bigint(20) UNSIGNED NOT NULL,
+  `session_id` varchar(64) NOT NULL,
+  `ip_address` varchar(45) NOT NULL,
+  `user_agent` text DEFAULT NULL,
+  `device_type` enum('Desktop','Mobile','Tablet','Bot') NOT NULL DEFAULT 'Desktop',
+  `browser` varchar(50) NOT NULL DEFAULT 'Other',
+  `platform` varchar(50) NOT NULL DEFAULT 'Other',
+  `country` varchar(100) DEFAULT 'Localhost / Unknown',
+  `city` varchar(100) DEFAULT 'Unknown',
+  `page_url` varchar(255) NOT NULL,
+  `referrer` varchar(255) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `last_activity` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `visitor_logs`
+--
+
+INSERT INTO `visitor_logs` (`id`, `session_id`, `ip_address`, `user_agent`, `device_type`, `browser`, `platform`, `country`, `city`, `page_url`, `referrer`, `created_at`, `last_activity`) VALUES
+(1, '03vn4ifk2rv7c9c503gg0igtsd', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36', 'Desktop', 'Chrome', 'Windows', 'Localhost / Intranet', 'Internal', '/portfolio/', NULL, '2026-11-08 13:38:52', '2026-11-08 13:38:52'),
+(2, '03vn4ifk2rv7c9c503gg0igtsd', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36', 'Desktop', 'Chrome', 'Windows', 'Localhost / Intranet', 'Internal', '/portfolio/', NULL, '2026-11-08 13:51:56', '2026-11-08 13:51:56');
+
 --
 -- Indexes for dumped tables
 --
@@ -322,6 +370,13 @@ INSERT INTO `smtp_settings` (`id`, `host`, `port`, `encryption`, `username`, `pa
 ALTER TABLE `admin_users`
   ADD PRIMARY KEY (`id`),
   ADD UNIQUE KEY `username` (`username`);
+
+--
+-- Indexes for table `click_logs`
+--
+ALTER TABLE `click_logs`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_click_created` (`created_at`);
 
 --
 -- Indexes for table `contact_messages`
@@ -341,7 +396,8 @@ ALTER TABLE `education`
 -- Indexes for table `experience`
 --
 ALTER TABLE `experience`
-  ADD PRIMARY KEY (`id`);
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `fk_experience_parent` (`parent_id`);
 
 --
 -- Indexes for table `experience_responsibilities`
@@ -390,6 +446,16 @@ ALTER TABLE `smtp_settings`
   ADD PRIMARY KEY (`id`);
 
 --
+-- Indexes for table `visitor_logs`
+--
+ALTER TABLE `visitor_logs`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_session` (`session_id`),
+  ADD KEY `idx_ip` (`ip_address`),
+  ADD KEY `idx_created` (`created_at`),
+  ADD KEY `idx_last_activity` (`last_activity`);
+
+--
 -- AUTO_INCREMENT for dumped tables
 --
 
@@ -398,6 +464,12 @@ ALTER TABLE `smtp_settings`
 --
 ALTER TABLE `admin_users`
   MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+
+--
+-- AUTO_INCREMENT for table `click_logs`
+--
+ALTER TABLE `click_logs`
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `contact_messages`
@@ -415,41 +487,53 @@ ALTER TABLE `education`
 -- AUTO_INCREMENT for table `experience`
 --
 ALTER TABLE `experience`
-  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
 
 --
 -- AUTO_INCREMENT for table `experience_responsibilities`
 --
 ALTER TABLE `experience_responsibilities`
-  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=19;
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=89;
 
 --
 -- AUTO_INCREMENT for table `projects`
 --
 ALTER TABLE `projects`
-  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 
 --
 -- AUTO_INCREMENT for table `project_tags`
 --
 ALTER TABLE `project_tags`
-  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10;
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
 
 --
 -- AUTO_INCREMENT for table `skills`
 --
 ALTER TABLE `skills`
-  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=11;
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 
 --
 -- AUTO_INCREMENT for table `skill_groups`
 --
 ALTER TABLE `skill_groups`
-  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+
+--
+-- AUTO_INCREMENT for table `visitor_logs`
+--
+ALTER TABLE `visitor_logs`
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 --
 -- Constraints for dumped tables
 --
+
+--
+-- Constraints for table `experience`
+--
+ALTER TABLE `experience`
+  ADD CONSTRAINT `fk_experience_parent` FOREIGN KEY (`parent_id`) REFERENCES `experience` (`id`) ON DELETE CASCADE;
 
 --
 -- Constraints for table `experience_responsibilities`

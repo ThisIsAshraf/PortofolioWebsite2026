@@ -35,6 +35,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         redirect('admin/login');
     }
 
+    // Clear Analytics Records
+    if ($action === 'clear_analytics') {
+        $pdo->exec('TRUNCATE TABLE visitor_logs');
+        $pdo->exec('TRUNCATE TABLE click_logs');
+        flash('success', 'All visitor telemetry and click records have been wiped clean.');
+        redirect('admin/analytics');
+    }
+
     // Profile & Photo Update
     if ($action === 'save_profile') {
         $keys = ['name', 'role', 'location', 'headline', 'intro', 'linkedin', 'email', 'phone'];
@@ -363,6 +371,75 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         redirect("admin/messages?view={$id}");
     }
 
+    // Send Direct Email Reply to Visitor
+    if ($action === 'send_reply') {
+        $messageId = (int)($_POST['message_id'] ?? 0);
+        $toEmail = trim((string)($_POST['recipient_email'] ?? ''));
+        $toName = trim((string)($_POST['recipient_name'] ?? ''));
+        $replySubject = trim((string)($_POST['reply_subject'] ?? ''));
+        $replyBody = trim((string)($_POST['reply_body'] ?? ''));
+        $quoteOriginal = !empty($_POST['quote_original']);
+
+        if ($messageId <= 0 || !filter_var($toEmail, FILTER_VALIDATE_EMAIL) || $replyBody === '') {
+            flash('error', 'Valid recipient email and reply content are required.');
+            redirect("admin/messages?view={$messageId}");
+        }
+
+        $smtp = get_smtp_config();
+        if (empty($smtp['is_active']) || empty($smtp['host']) || empty($smtp['username']) || empty($smtp['password'])) {
+            flash('error', 'SMTP is not active or configured. Please visit SMTP & Mail Settings first.');
+            redirect("admin/messages?view={$messageId}");
+        }
+
+        // Fetch original message for quoting
+        $mStmt = $pdo->prepare('SELECT * FROM contact_messages WHERE id = ?');
+        $mStmt->execute([$messageId]);
+        $orig = $mStmt->fetch();
+
+        try {
+            $mail = new \PHPMailer\PHPMailer\PHPMailer(true);
+            $mail->isSMTP();
+            $mail->Host       = $smtp['host'];
+            $mail->SMTPAuth   = true;
+            $mail->Username   = $smtp['username'];
+            $mail->Password   = $smtp['password'];
+            $mail->SMTPSecure = ($smtp['encryption'] === 'ssl')
+                ? \PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_SMTPS
+                : \PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_STARTTLS;
+            $mail->Port       = (int)$smtp['port'];
+
+            $fromEmail = $smtp['from_email'] ?: $smtp['username'];
+            $fromName  = $smtp['from_name'] ?: setting('name', 'Portfolio Admin');
+            $mail->setFrom($fromEmail, (string)$fromName);
+            $mail->addAddress($toEmail, $toName);
+            $mail->addReplyTo($fromEmail, (string)$fromName);
+
+            $mail->isHTML(true);
+            $mail->Subject = $replySubject;
+
+            $htmlContent = nl2br(e($replyBody));
+            if ($quoteOriginal && $orig) {
+                $htmlContent .= '<br><br><hr style="border:none;border-top:1px solid #cbd5e1;margin:20px 0;">'
+                    . '<p style="color:#64748b;font-size:12px;"><strong>Original Inquiry from ' . e($orig['name']) . ' (' . e($orig['created_at']) . '):</strong><br>'
+                    . nl2br(e($orig['message'])) . '</p>';
+            }
+
+            $mail->Body    = $htmlContent;
+            $mail->AltBody = strip_tags(str_replace(['<br>', '<br/>', '<br />'], "\n", $htmlContent));
+
+            $mail->send();
+
+            // Automatically update message status to 'replied'
+            $pdo->prepare("UPDATE contact_messages SET status = 'replied' WHERE id = ?")->execute([$messageId]);
+
+            flash('success', 'Reply dispatched successfully to ' . $toEmail);
+        } catch (\Throwable $e) {
+            flash('error', 'Reply dispatch failed: ' . $e->getMessage());
+        }
+
+        redirect("admin/messages?view={$messageId}");
+    }
+
     if ($action === 'delete_message') {
         $stmt = $pdo->prepare('DELETE FROM contact_messages WHERE id = ?');
         $stmt->execute([(int)($_POST['id'] ?? 0)]);
@@ -400,7 +477,7 @@ if ($page === 'profile') {
     exit;
 }
 
-// Site Settings View (Hero, Section Headers, Subtitles, Callout Badges)
+// Site Settings View
 if ($page === 'settings') {
     $title = 'Site Settings';
     $settingKeys = [
@@ -462,7 +539,6 @@ if ($page === 'content') {
     $rows = [];
     $companies = [];
 
-    // Allow all roles to be selectable as parents in the dropdown
     if ($type === 'experience') {
         $companies = $pdo->query('
             SELECT id, company, role 
@@ -566,6 +642,146 @@ if ($page === 'messages') {
 
     require __DIR__ . '/views/header.php';
     require __DIR__ . '/views/messages.php';
+    require __DIR__ . '/views/footer.php';
+    exit;
+}
+
+// -----------------------------------------------------------------------------
+// Site Analytics & Monitoring Controller
+// -----------------------------------------------------------------------------
+if ($page === 'analytics') {
+    $period = (string)($_GET['period'] ?? '30d');
+    $deviceFilter = (string)($_GET['device'] ?? 'all');
+    $startDate = trim((string)($_GET['start_date'] ?? ''));
+    $endDate = trim((string)($_GET['end_date'] ?? ''));
+
+    // Compute Date Range (Y-m-d)
+    if ($period === 'today') {
+        $start = date('Y-m-d');
+        $end = date('Y-m-d');
+    } elseif ($period === '7d') {
+        $start = date('Y-m-d', strtotime('-6 days'));
+        $end = date('Y-m-d');
+    } elseif ($period === '90d') {
+        $start = date('Y-m-d', strtotime('-89 days'));
+        $end = date('Y-m-d');
+    } elseif ($period === 'custom' && $startDate !== '' && $endDate !== '') {
+        $start = $startDate;
+        $end = $endDate;
+    } else {
+        $period = '30d';
+        $start = date('Y-m-d', strtotime('-29 days'));
+        $end = date('Y-m-d');
+    }
+
+    // Precise Full-Day Timestamp Boundary (midnight to 23:59:59)
+    $startTime = $start . ' 00:00:00';
+    $endTime = $end . ' 23:59:59';
+
+    $whereParts = ["created_at >= ? AND created_at <= ?"];
+    $bindings = [$startTime, $endTime];
+
+    if ($deviceFilter !== 'all' && in_array($deviceFilter, ['Desktop', 'Mobile', 'Tablet'], true)) {
+        $whereParts[] = "device_type = ?";
+        $bindings[] = $deviceFilter;
+    }
+    $whereSql = implode(' AND ', $whereParts);
+
+    // CSV Exporter (Applies Active Filters)
+    if (isset($_GET['export']) && $_GET['export'] === 'csv') {
+        header('Content-Type: text/csv; charset=utf-8');
+        header('Content-Disposition: attachment; filename="portfolio_analytics_' . $start . '_to_' . $end . '.csv"');
+        $out = fopen('php://output', 'w');
+        fputcsv($out, ['ID', 'IP Address', 'Device', 'Browser', 'Platform', 'Country', 'Page URL', 'Referrer', 'Timestamp']);
+
+        $exportStmt = $pdo->prepare("SELECT id, ip_address, device_type, browser, platform, country, page_url, referrer, created_at FROM visitor_logs WHERE {$whereSql} ORDER BY id DESC LIMIT 10000");
+        $exportStmt->execute($bindings);
+        while ($row = $exportStmt->fetch(PDO::FETCH_ASSOC)) {
+            fputcsv($out, $row);
+        }
+        fclose($out);
+        exit;
+    }
+
+    $title = 'Site Analytics & Telemetry';
+
+    // Summary KPI Metrics
+    $kpiViews = $pdo->prepare("SELECT COUNT(*) FROM visitor_logs WHERE {$whereSql}");
+    $kpiViews->execute($bindings);
+    $totalViews = (int)$kpiViews->fetchColumn();
+
+    $kpiUniques = $pdo->prepare("SELECT COUNT(DISTINCT ip_address) FROM visitor_logs WHERE {$whereSql}");
+    $kpiUniques->execute($bindings);
+    $uniqueVisitors = (int)$kpiUniques->fetchColumn();
+
+    $stats = [
+        'total_views'      => $totalViews,
+        'unique_visitors'  => $uniqueVisitors,
+        'active_visitors'  => (int)$pdo->query('SELECT COUNT(DISTINCT ip_address) FROM visitor_logs WHERE last_activity >= (NOW() - INTERVAL 5 MINUTE)')->fetchColumn(),
+        'total_clicks'     => (int)$pdo->query('SELECT COUNT(*) FROM click_logs')->fetchColumn()
+    ];
+
+    // Dynamic Daily Graph Aggregation
+    $chartStmt = $pdo->prepare("
+        SELECT 
+            DATE(created_at) AS log_date,
+            COUNT(*) AS total_views,
+            COUNT(DISTINCT ip_address) AS unique_visitors
+        FROM visitor_logs
+        WHERE {$whereSql}
+        GROUP BY DATE(created_at)
+        ORDER BY log_date ASC
+    ");
+    $chartStmt->execute($bindings);
+    $dailyRaw = $chartStmt->fetchAll(PDO::FETCH_UNIQUE | PDO::FETCH_ASSOC);
+
+    $chartData = [];
+    $curr = new DateTime($start);
+    $stop = new DateTime($end);
+    $stop->modify('+1 day'); // Ensure end date inclusive
+
+    while ($curr < $stop) {
+        $d = $curr->format('Y-m-d');
+        $shortLabel = $curr->format('M j');
+        $v = isset($dailyRaw[$d]) ? (int)$dailyRaw[$d]['total_views'] : 0;
+        $u = isset($dailyRaw[$d]) ? (int)$dailyRaw[$d]['unique_visitors'] : 0;
+        $chartData[] = [
+            'date'    => $d,
+            'label'   => $shortLabel,
+            'views'   => $v,
+            'uniques' => $u
+        ];
+        $curr->modify('+1 day');
+    }
+
+    // Filtered Table Breakdowns
+    $recentStmt = $pdo->prepare("SELECT * FROM visitor_logs WHERE {$whereSql} ORDER BY id DESC LIMIT 25");
+    $recentStmt->execute($bindings);
+    $recentLogs = $recentStmt->fetchAll();
+
+    $devStmt = $pdo->prepare("SELECT device_type, COUNT(*) as cnt FROM visitor_logs WHERE {$whereSql} GROUP BY device_type ORDER BY cnt DESC");
+    $devStmt->execute($bindings);
+    $devices = $devStmt->fetchAll();
+
+    $brwStmt = $pdo->prepare("SELECT browser, COUNT(*) as cnt FROM visitor_logs WHERE {$whereSql} GROUP BY browser ORDER BY cnt DESC");
+    $brwStmt->execute($bindings);
+    $browsers = $brwStmt->fetchAll();
+
+    $pageStmt = $pdo->prepare("SELECT page_url, COUNT(*) as visits FROM visitor_logs WHERE {$whereSql} GROUP BY page_url ORDER BY visits DESC LIMIT 8");
+    $pageStmt->execute($bindings);
+    $pages = $pageStmt->fetchAll();
+
+    $clicks = $pdo->query('SELECT element_text, target_url, COUNT(*) as total_clicks FROM click_logs GROUP BY target_url, element_text ORDER BY total_clicks DESC LIMIT 8')->fetchAll();
+
+    $filterQuery = http_build_query([
+        'period'     => $period,
+        'device'     => $deviceFilter,
+        'start_date' => $start,
+        'end_date'   => $end
+    ]);
+
+    require __DIR__ . '/views/header.php';
+    require __DIR__ . '/views/analytics.php';
     require __DIR__ . '/views/footer.php';
     exit;
 }

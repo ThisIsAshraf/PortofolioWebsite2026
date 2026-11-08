@@ -18,29 +18,45 @@
   // 2. Theme Persistence (Local Storage)
   const themeToggle = document.getElementById("themeToggle");
   const savedTheme = localStorage.getItem("site-theme");
+
   if (savedTheme === "light") {
+    document.documentElement.classList.add("light-theme");
     document.body.classList.add("light-theme");
+    if (themeToggle) themeToggle.textContent = "☽";
+  } else {
+    document.documentElement.classList.remove("light-theme");
+    document.body.classList.remove("light-theme");
+    if (themeToggle) themeToggle.textContent = "☼";
   }
 
   if (themeToggle) {
     themeToggle.addEventListener("click", () => {
       const isLight = document.body.classList.toggle("light-theme");
+      document.documentElement.classList.toggle("light-theme", isLight);
       localStorage.setItem("site-theme", isLight ? "light" : "dark");
+      themeToggle.textContent = isLight ? "☽" : "☼";
     });
   }
 
   // 3. Skills Category Filter
-  const filterButtons = document.querySelectorAll("[data-filter]");
+  const filterButtons = document.querySelectorAll(".filter-button");
   const skillCards = document.querySelectorAll(".skill-card");
 
   filterButtons.forEach((button) => {
     button.addEventListener("click", () => {
       filterButtons.forEach((btn) => btn.classList.remove("active"));
       button.classList.add("active");
-      const filter = button.dataset.filter;
+      const filter = button.getAttribute("data-filter") || "all";
 
       skillCards.forEach((card) => {
-        card.hidden = filter !== "all" && card.dataset.group !== filter;
+        const group = card.getAttribute("data-group");
+        if (filter === "all" || group === filter) {
+          card.removeAttribute("hidden");
+          card.style.display = "";
+        } else {
+          card.setAttribute("hidden", "true");
+          card.style.display = "none";
+        }
       });
     });
   });
@@ -77,8 +93,6 @@
       alertBox.innerHTML = "";
 
       const formData = new FormData(contactForm);
-
-      // Fix: getAttribute('action') prevents collision with <input name="action">
       const targetUrl =
         contactForm.getAttribute("action") || window.location.href;
 
@@ -94,7 +108,6 @@
 
         const data = await response.json();
 
-        // Update CSRF token for subsequent requests
         if (data.csrf_token && csrfField) {
           csrfField.value = data.csrf_token;
         }
@@ -121,3 +134,39 @@
     });
   }
 })();
+
+// 6. Global Click Event Tracker (Beacon)
+document.addEventListener("click", (e) => {
+  const targetEl = e.target.closest("a, button");
+  if (!targetEl) return;
+
+  const href = targetEl.getAttribute("href") || "";
+  const label = (targetEl.innerText || "").trim().slice(0, 50);
+  const elementId = targetEl.id || targetEl.className || "";
+
+  const basePath = window.location.pathname.includes("/portfolio/")
+    ? "/portfolio/"
+    : "/";
+  const beaconEndpoint = basePath + "track-click.php";
+
+  if (href || targetEl.tagName === "BUTTON") {
+    const payload = JSON.stringify({
+      target_url: href || "Action Trigger",
+      element_text: label,
+      element_id: elementId,
+    });
+
+    try {
+      if (navigator.sendBeacon) {
+        navigator.sendBeacon(beaconEndpoint, payload);
+      } else {
+        fetch(beaconEndpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: payload,
+          keepalive: true,
+        });
+      }
+    } catch (_) {}
+  }
+});

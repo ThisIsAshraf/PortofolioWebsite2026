@@ -33,6 +33,9 @@ declare(strict_types=1);
                 <a class="<?= $page === 'messages' ? 'active' : '' ?>" href="<?= e(url('admin/messages')) ?>">✉ &nbsp; Messages</a>
                 <a class="<?= $page === 'smtp' ? 'active' : '' ?>" href="<?= e(url('admin/smtp')) ?>">⚙ &nbsp; SMTP &amp; Mail</a>
                 <a class="<?= $page === 'settings' ? 'active' : '' ?>" href="<?= e(url('admin/settings')) ?>">🎛 &nbsp; Site Settings</a>
+                <a class="<?= ($page ?? '') === 'analytics' ? 'active' : '' ?>" href="<?= e(url('admin/analytics')) ?>">
+                    📊 &nbsp; Site Analytics
+                </a>
             </nav>
             <div class="sidebar-bottom">
                 <a href="<?= e(url('')) ?>" target="_blank" rel="noopener">↗ View live website</a>
