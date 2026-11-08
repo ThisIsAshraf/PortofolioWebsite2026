@@ -440,6 +440,87 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         redirect("admin/messages?view={$messageId}");
     }
 
+    // CV Template Management Handlers
+    if ($action === 'set_default_cv') {
+        $id = (int)($_POST['id'] ?? 0);
+        $pdo->beginTransaction();
+        $pdo->exec('UPDATE cv_templates SET is_default = 0');
+        $stmt = $pdo->prepare('UPDATE cv_templates SET is_default = 1, is_enabled = 1 WHERE id = ?');
+        $stmt->execute([$id]);
+        $pdo->commit();
+        flash('success', 'Default public CV layout updated.');
+        redirect('admin/cv');
+    }
+
+    if ($action === 'toggle_cv_template') {
+        $id = (int)($_POST['id'] ?? 0);
+        $stmt = $pdo->prepare('UPDATE cv_templates SET is_enabled = 1 - is_enabled WHERE id = ?');
+        $stmt->execute([$id]);
+        flash('success', 'CV layout visibility updated.');
+        redirect('admin/cv');
+    }
+
+    // Save Granular CV Customization Settings
+    if ($action === 'save_cv_settings') {
+        $keys = [
+            'cv_display_name',
+            'cv_display_title',
+            'cv_ats_subline',
+            'cv_phone',
+            'cv_email',
+            'cv_location',
+            'cv_linkedin',
+            'cv_photo_shape',
+            'cv_photo_size',
+            'cv_photo_border_color',
+            'cv_show_photo',
+            'cv_show_summary',
+            'cv_show_competencies',
+            'cv_show_matrix',
+            'cv_show_experience',
+            'cv_show_education',
+            'cv_show_training',
+            'cv_show_languages',
+            'cv_sec_summary_title',
+            'cv_sec_expertise_title',
+            'cv_sec_competencies_title',
+            'cv_sec_experience_title',
+            'cv_sec_education_title',
+            'cv_sec_matrix_title',
+            'cv_sec_training_title',
+            'cv_sec_languages_title',
+            'cv_custom_summary',
+            'cv_languages',
+            'cv_trainings'
+        ];
+
+        foreach ($keys as $k) {
+            set_setting($k, trim((string)($_POST[$k] ?? '')));
+        }
+
+        // Process Dynamic Matrix Rows
+        $matrixLabels = $_POST['matrix_label'] ?? [];
+        $matrixSkills = $_POST['matrix_skills'] ?? [];
+        $matrixData = [];
+
+        if (is_array($matrixLabels) && is_array($matrixSkills)) {
+            foreach ($matrixLabels as $idx => $label) {
+                $lbl = trim((string)$label);
+                $skl = trim((string)($matrixSkills[$idx] ?? ''));
+                if ($lbl !== '' || $skl !== '') {
+                    $matrixData[] = [
+                        'label'  => $lbl,
+                        'skills' => $skl
+                    ];
+                }
+            }
+        }
+        set_setting('cv_matrix_json', json_encode($matrixData, JSON_UNESCAPED_UNICODE));
+
+        flash('success', 'CV layout rules, dynamic matrix, and content saved.');
+        redirect('admin/cv');
+    }
+
     if ($action === 'delete_message') {
         $stmt = $pdo->prepare('DELETE FROM contact_messages WHERE id = ?');
         $stmt->execute([(int)($_POST['id'] ?? 0)]);
@@ -642,6 +723,52 @@ if ($page === 'messages') {
 
     require __DIR__ . '/views/header.php';
     require __DIR__ . '/views/messages.php';
+    require __DIR__ . '/views/footer.php';
+    exit;
+}
+
+// CV Template Manager View
+if ($page === 'cv') {
+    $title = 'CV Layout & Granular Line Editor';
+    $templates = $pdo->query('SELECT * FROM cv_templates ORDER BY sort_order ASC, id ASC')->fetchAll();
+
+    $matrixJson = setting('cv_matrix_json', '');
+    $matrixRows = json_decode($matrixJson, true);
+    if (!is_array($matrixRows) || empty($matrixRows)) {
+        $matrixRows = [
+            ['label' => 'IT Support & Operation', 'skills' => 'L1/L2 Support, Service Desk, Remote Support, Asset Management, Troubleshooting'],
+            ['label' => 'Ticketing & SaaS', 'skills' => 'Zendesk, Jira SM, ServiceNow, Google Workspace, M365 Administration'],
+            ['label' => 'Networking & OS', 'skills' => 'TCP/IP, DNS, LAN/WAN, Windows Server, RHEL Administration'],
+            ['label' => 'Cloud and Database', 'skills' => 'AWS, Azure, MySQL, MSSQL Server']
+        ];
+    }
+
+    $cv = [
+        'name'               => setting('cv_display_name', setting('name', 'Ashraful Alam Shihab')),
+        'title'              => setting('cv_display_title', setting('role', 'Senior Desktop Support Engineer')),
+        'ats_subline'        => setting('cv_ats_subline', 'Senior Desktop Support Engineer | IT Support | Service Desk | IT Operations'),
+        'phone'              => setting('cv_phone', setting('phone', '+8801982401992')),
+        'email'              => setting('cv_email', setting('email', 'meet.ashraf.uk@gmail.com')),
+        'location'           => setting('cv_location', setting('location', 'Dhaka, Bangladesh')),
+        'linkedin'           => setting('cv_linkedin', 'linkedin.com/in/ashraful98'),
+
+        'sec_summary'        => setting('cv_sec_summary_title', 'Professional Summary'),
+        'sec_expertise'      => setting('cv_sec_expertise_title', 'Areas of Expertise'),
+        'sec_competencies'   => setting('cv_sec_competencies_title', 'Core Competencies'),
+        'sec_experience'     => setting('cv_sec_experience_title', 'Professional Experience'),
+        'sec_education'      => setting('cv_sec_education_title', 'Education'),
+        'sec_matrix'         => setting('cv_sec_matrix_title', 'Technical Skills Matrix'),
+        'sec_training'       => setting('cv_sec_training_title', 'Training & Certifications'),
+        'sec_languages'      => setting('cv_sec_languages_title', 'Languages'),
+
+        'summary'            => setting('cv_custom_summary', setting('intro', '')),
+        'languages'          => setting('cv_languages', "Bangla - Native\nEnglish - Fluent\nHindi - Fluent"),
+        'trainings'          => setting('cv_trainings', "CCNA 200-301 — 2023\nLinux System Administration — 2022\nGoogle IT Support Professional — 2022\nWindows Server Administration — 2022"),
+        'matrix_rows'        => $matrixRows
+    ];
+
+    require __DIR__ . '/views/header.php';
+    require __DIR__ . '/views/cv_manager.php';
     require __DIR__ . '/views/footer.php';
     exit;
 }

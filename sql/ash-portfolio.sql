@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Nov 08, 2026 at 02:54 PM
+-- Generation Time: Nov 08, 2026 at 08:06 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -78,7 +78,39 @@ CREATE TABLE `contact_messages` (
 --
 
 INSERT INTO `contact_messages` (`id`, `name`, `email`, `subject`, `message`, `created_at`, `status`) VALUES
-(1, 'Ashraful Alam Shihab', 'alamshihab526@gmail.com', 'System Mail', 'bkllhbkllbnlllllllll', '2026-11-08 12:44:30', 'read');
+(1, 'Ashraful Alam Shihab', 'alamshihab526@gmail.com', 'System Mail', 'bkllhbkllbnlllllllll', '2026-11-08 12:44:30', 'replied');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `cv_templates`
+--
+
+CREATE TABLE `cv_templates` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `template_key` varchar(50) NOT NULL,
+  `title` varchar(100) NOT NULL,
+  `description` varchar(255) NOT NULL,
+  `accent_color` varchar(20) NOT NULL DEFAULT '#ea580c',
+  `has_photo` tinyint(1) NOT NULL DEFAULT 0,
+  `is_enabled` tinyint(1) NOT NULL DEFAULT 1,
+  `is_default` tinyint(1) NOT NULL DEFAULT 0,
+  `sort_order` int(11) NOT NULL DEFAULT 0,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `cv_templates`
+--
+
+INSERT INTO `cv_templates` (`id`, `template_key`, `title`, `description`, `accent_color`, `has_photo`, `is_enabled`, `is_default`, `sort_order`, `created_at`) VALUES
+(1, 'modern_orange', '1. Modern Orange Badges (Photo)', 'Top avatar with orange badges, clean company dividers, and language pills.', '#ea580c', 1, 1, 1, 1, '2026-11-08 18:49:21'),
+(2, 'executive_split', '2. Novoresume Executive Split (Photo)', 'Full-height navy sidebar with circular photo, contact icons, and dual-column layout.', '#0284c7', 1, 1, 0, 2, '2026-11-08 18:49:21'),
+(3, 'creative_banner', '3. Creative Banner (Photo)', 'Dark full-width header banner with circular avatar badge and clean body sections.', '#0f172a', 1, 1, 0, 3, '2026-11-08 18:49:21'),
+(4, 'novoresume_modern', '4. Novoresume Modern (Photo)', 'Top-right photo card with high-density layout and tag clouds.', '#2563eb', 1, 1, 0, 4, '2026-11-08 18:49:21'),
+(5, 'hybrid_teal', '5. Hybrid Teal Executive (Photo)', 'Teal accent banners, side badges, rounded photo, and compact structured history.', '#0d9488', 1, 1, 0, 5, '2026-11-08 18:49:21'),
+(6, 'ivy_compact', '6. Ivy League Compact (Photo)', 'Refined corporate layout with dual columns, top accent border, and high information density.', '#4338ca', 1, 1, 0, 6, '2026-11-08 18:49:21'),
+(7, 'classic_ats', '7. Classic Corporate ATS (No Photo)', 'Strict ATS-compliant serif layout with 3-column competencies and skills matrix table.', '#991b1b', 0, 1, 0, 7, '2026-11-08 18:49:21');
 
 -- --------------------------------------------------------
 
@@ -225,6 +257,60 @@ CREATE TABLE `site_settings` (
 
 INSERT INTO `site_settings` (`setting_key`, `setting_value`) VALUES
 ('availability_status', 'IT SUPPORT · OPERATIONS · INFRASTRUCTURE'),
+('cv_accent_color', '#b91c1c'),
+('cv_ats_subline', 'Senior Desktop Support Engineer | IT Support | Service Desk | IT Operations'),
+('cv_custom_summary', 'Experienced Technical Support Specialist with over 4+ years of expertise in resolving complex IT issues, managing IT hardware and software, and possessing a solid foundation in networking, Linux systems, and Windows Server. Demonstrated success in ensuring seamless operations, showcasing strong problem-solving skills, and employing effective communication to ensure end-user satisfaction.'),
+('cv_display_name', 'Ashraful Alam Shihab'),
+('cv_display_title', 'Senior Desktop Support Engineer'),
+('cv_email', 'meet.ashraf.uk@gmail.com'),
+('cv_font_family', 'Merriweather, Georgia, serif'),
+('cv_font_size', '13px'),
+('cv_github', 'github.com/ashraful98'),
+('cv_heading_color', '#0f172a'),
+('cv_languages', 'Bangla - Native\r\nEnglish - Fluent\r\nHindi - Fluent'),
+('cv_line_color', '#cbd5e1'),
+('cv_linkedin', 'linkedin.com/in/ashraful98'),
+('cv_location', 'Dhaka, Bangladesh'),
+('cv_matrix_json', '[\r\n  {\"label\": \"IT Support & Operation\", \"skills\": \"L1/L2 Support, Service Desk, Remote Support, Asset Management, IT Procurement, Vendor Coordination, Hardware/Software Troubleshooting\"},\r\n  {\"label\": \"Ticketing & SaaS\", \"skills\": \"Zendesk, Jira SM, ServiceNow, Google Workspace, M365 Administration\"},\r\n  {\"label\": \"Networking & OS\", \"skills\": \"TCP/IP, DNS, LAN/WAN, Windows Server, RHEL Administration\"},\r\n  {\"label\": \"Cloud and Database\", \"skills\": \"AWS, Azure, MySQL, MSSQL Server\"}\r\n]'),
+('cv_matrix_row_1_label', 'IT Support & Operation'),
+('cv_matrix_row_1_val', 'L1/L2 Support, Service Desk, Remote Support, Asset Management, IT Procurement, Vendor Coordination, Hardware/Software Troubleshooting'),
+('cv_matrix_row_2_label', 'Ticketing & SaaS'),
+('cv_matrix_row_2_val', 'Zendesk, Jira SM, ServiceNow, Google Workspace, M365 Administration'),
+('cv_matrix_row_3_label', 'Networking & OS'),
+('cv_matrix_row_3_val', 'TCP/IP, DNS, LAN/WAN, Windows Server, RHEL Administration'),
+('cv_matrix_row_4_label', 'Cloud and Database'),
+('cv_matrix_row_4_val', 'AWS, Azure, MySQL, MSSQL Server'),
+('cv_page_margin', '20mm'),
+('cv_phone', '+8801982401992'),
+('cv_photo_border_color', '#ea580c'),
+('cv_photo_shape', 'rounded'),
+('cv_photo_size', '130px'),
+('cv_sec_competencies_title', 'Core Competencies'),
+('cv_sec_education_title', 'Education'),
+('cv_sec_experience_title', 'Professional Experience'),
+('cv_sec_expertise_title', 'Areas of Expertise'),
+('cv_sec_languages_title', 'Languages'),
+('cv_sec_matrix_title', 'Technical Skills Matrix'),
+('cv_sec_summary_title', 'Professional Summary'),
+('cv_sec_training_title', 'Training & Certifications'),
+('cv_show_competencies', '1'),
+('cv_show_education', '1'),
+('cv_show_experience', '1'),
+('cv_show_languages', '1'),
+('cv_show_matrix', '1'),
+('cv_show_photo', '1'),
+('cv_show_projects', '0'),
+('cv_show_summary', '1'),
+('cv_show_training', '1'),
+('cv_title_competencies', 'CORE COMPETENCIES'),
+('cv_title_education', 'EDUCATION'),
+('cv_title_experience', 'PROFESSIONAL EXPERIENCE'),
+('cv_title_languages', 'LANGUAGES'),
+('cv_title_matrix', 'TECHNICAL SKILLS MATRIX'),
+('cv_title_projects', 'KEY PROJECTS & INITIATIVES'),
+('cv_title_summary', 'PROFESSIONAL SUMMARY'),
+('cv_title_training', 'TRAINING & CERTIFICATIONS'),
+('cv_trainings', 'CCNA 200-301 — 2023\r\nLinux System Administration — 2022\r\nGoogle IT Support Professional — 2022\r\nWindows Server Administration — 2022\r\nMS SQL Server Administration — 2021\r\nNetworking Essential — 2021'),
 ('edu_learning_text', 'Focused on Microsoft 365, Entra ID, Azure administration, and lab-based deployments.'),
 ('edu_learning_title', 'Building toward cloud & enterprise infrastructure'),
 ('email', 'meet.ashraf.uk@gmail.com'),
@@ -357,8 +443,7 @@ CREATE TABLE `visitor_logs` (
 --
 
 INSERT INTO `visitor_logs` (`id`, `session_id`, `ip_address`, `user_agent`, `device_type`, `browser`, `platform`, `country`, `city`, `page_url`, `referrer`, `created_at`, `last_activity`) VALUES
-(1, '03vn4ifk2rv7c9c503gg0igtsd', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36', 'Desktop', 'Chrome', 'Windows', 'Localhost / Intranet', 'Internal', '/portfolio/', NULL, '2026-11-08 13:38:52', '2026-11-08 13:38:52'),
-(2, '03vn4ifk2rv7c9c503gg0igtsd', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36', 'Desktop', 'Chrome', 'Windows', 'Localhost / Intranet', 'Internal', '/portfolio/', NULL, '2026-11-08 13:51:56', '2026-11-08 13:51:56');
+(1, 'jl81oefdtv8qv7vskv3n508pat', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36', 'Desktop', 'Chrome', 'Windows', 'Localhost / Intranet', 'Internal', '/portfolio/', 'http://localhost/portfolio/admin/', '2026-11-08 19:02:47', '2026-11-08 19:02:47');
 
 --
 -- Indexes for dumped tables
@@ -385,6 +470,13 @@ ALTER TABLE `contact_messages`
   ADD PRIMARY KEY (`id`),
   ADD KEY `idx_contact_created_at` (`created_at`),
   ADD KEY `idx_contact_status` (`status`);
+
+--
+-- Indexes for table `cv_templates`
+--
+ALTER TABLE `cv_templates`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `template_key` (`template_key`);
 
 --
 -- Indexes for table `education`
@@ -478,6 +570,12 @@ ALTER TABLE `contact_messages`
   MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 
 --
+-- AUTO_INCREMENT for table `cv_templates`
+--
+ALTER TABLE `cv_templates`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
+
+--
 -- AUTO_INCREMENT for table `education`
 --
 ALTER TABLE `education`
@@ -523,7 +621,7 @@ ALTER TABLE `skill_groups`
 -- AUTO_INCREMENT for table `visitor_logs`
 --
 ALTER TABLE `visitor_logs`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 
 --
 -- Constraints for dumped tables
