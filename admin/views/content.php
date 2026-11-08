@@ -9,6 +9,7 @@ declare(strict_types=1);
  * @var string $responsibilities
  * @var string $tags
  * @var array $rows
+ * @var array $companies
  */
 ?>
 <?php if ($isForm): ?>
@@ -37,14 +38,26 @@ declare(strict_types=1);
                     </label>
 
                 <?php elseif ($type === 'experience'): ?>
-                    <label>Job Title *
-                        <input name="role" required value="<?= e($item['role'] ?? '') ?>" placeholder="e.g., Desktop Support Engineer">
+                    <label class="wide">Position Type / Promotion Grouping
+                        <select name="parent_id">
+                            <option value="">Primary Company Role (Standard)</option>
+                            <?php foreach ($companies as $comp): ?>
+                                <?php if ($id && $comp['id'] == $id) continue; ?>
+                                <option value="<?= $comp['id'] ?>" <?= (!empty($item['parent_id']) && $item['parent_id'] == $comp['id']) ? 'selected' : '' ?>>
+                                    ↳ Promotion at <?= e($comp['company']) ?> (Parent: <?= e($comp['role']) ?>)
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
                     </label>
-                    <label>Company *
-                        <input name="company" required value="<?= e($item['company'] ?? '') ?>" placeholder="e.g., Noor Staffing Group">
+
+                    <label>Job Title *
+                        <input name="role" required value="<?= e($item['role'] ?? '') ?>" placeholder="e.g., Senior Desktop Support Engineer">
+                    </label>
+                    <label>Company Name
+                        <input name="company" value="<?= e($item['company'] ?? '') ?>" placeholder="e.g., Noor Staffing Group (optional if promotion is linked above)">
                     </label>
                     <label>Date Range *
-                        <input name="period" required value="<?= e($item['period'] ?? '') ?>" placeholder="e.g., Oct 2024 – Present">
+                        <input name="period" required value="<?= e($item['period'] ?? '') ?>" placeholder="e.g., Mar 2026 – Present">
                     </label>
                     <label>Location / Mode
                         <input name="location" value="<?= e($item['location'] ?? '') ?>" placeholder="e.g., Bangladesh / Remote">
@@ -111,7 +124,7 @@ declare(strict_types=1);
                             <th>Group</th>
                             <th>Level</th>
                         <?php elseif ($type === 'experience'): ?>
-                            <th>Role</th>
+                            <th>Role / Position</th>
                             <th>Company</th>
                             <th>Period</th>
                         <?php elseif ($type === 'projects'): ?>
@@ -135,7 +148,12 @@ declare(strict_types=1);
                                 <td><?= e($row['group_name']) ?></td>
                                 <td><?= e($row['level']) ?></td>
                             <?php elseif ($type === 'experience'): ?>
-                                <td><strong><?= e($row['role']) ?></strong></td>
+                                <td>
+                                    <?php if (!empty($row['parent_id'])): ?>
+                                        <span style="color:#0284c7; margin-right: 6px;">↳ Promotion:</span>
+                                    <?php endif; ?>
+                                    <strong><?= e($row['role']) ?></strong>
+                                </td>
                                 <td><?= e($row['company']) ?></td>
                                 <td><?= e($row['period']) ?></td>
                             <?php elseif ($type === 'projects'): ?>

@@ -102,20 +102,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'conta
     $respond(true, 'Thank you! Your message has been sent successfully.');
 }
 
-// Fetch Profile Details
+// Fetch Profile Details & Dynamic Settings
 $profile = [
-    'name'     => setting('name', 'Ashraful Alam Shihab'),
-    'role'     => setting('role', 'Senior Desktop Support Engineer'),
-    'location' => setting('location', 'Dhaka, Bangladesh'),
-    'headline' => setting('headline', 'IT support, systems administration, and reliable technology experiences.'),
-    'intro'    => setting('intro', 'I help people and teams work confidently with technology.'),
-    'linkedin' => setting('linkedin', 'https://www.linkedin.com/in/ashraful98/'),
-    'email'    => setting('email', ''),
-    'phone'    => setting('phone', ''),
-    'photo'    => setting('photo', '')
+    'name'           => setting('name', 'Ashraful Alam Shihab'),
+    'role'           => setting('role', 'Senior Desktop Support Engineer'),
+    'location'       => setting('location', 'Dhaka, Bangladesh'),
+    'headline'       => setting('headline', 'IT support, systems administration, and reliable technology experiences.'),
+    'intro'          => setting('intro', 'I help people and teams work confidently with technology.'),
+    'linkedin'       => setting('linkedin', 'https://www.linkedin.com/in/ashraful98/'),
+    'email'          => setting('email', ''),
+    'phone'          => setting('phone', ''),
+    'photo'          => setting('photo', ''),
+    'learning_title' => setting('learning_title', 'Currently growing'),
+    'learning_text'  => setting('learning_text', 'Microsoft 365 Administration · Microsoft Entra ID · Azure Administrator (AZ-104 path)')
 ];
 
-// Fetch Normalized Skills & Skill Groups
+// Fetch Normalized Skills & Groups
 $skillsStmt = $pdo->query('
     SELECT s.*, g.name AS group_name 
     FROM skills s 
@@ -130,16 +132,31 @@ foreach ($skills as $skill) {
     $groups[$skill['group_name']] = true;
 }
 
-// Fetch Normalized Work Experience with Responsibilities
-$expStmt = $pdo->query('SELECT * FROM experience WHERE is_visible = 1 ORDER BY sort_order ASC, id ASC');
+// Fetch Normalized Work Experience (Current Primary Roles)
+$expStmt = $pdo->query('
+    SELECT * FROM experience 
+    WHERE is_visible = 1 AND parent_id IS NULL 
+    ORDER BY sort_order ASC, id ASC
+');
 $experience = $expStmt->fetchAll();
+
+// Fetch Promotions / Prior Roles under same company
+$childStmt = $pdo->query('
+    SELECT * FROM experience 
+    WHERE is_visible = 1 AND parent_id IS NOT NULL 
+    ORDER BY sort_order ASC, id ASC
+');
+$childRoles = [];
+foreach ($childStmt->fetchAll() as $child) {
+    $childRoles[(int)$child['parent_id']][] = $child;
+}
 
 $respStmt = $pdo->query('SELECT * FROM experience_responsibilities ORDER BY sort_order ASC, id ASC');
 $allResponsibilities = $respStmt->fetchAll();
 
 $expResponsibilities = [];
 foreach ($allResponsibilities as $r) {
-    $expResponsibilities[$r['experience_id']][] = $r['responsibility'];
+    $expResponsibilities[(int)$r['experience_id']][] = $r['responsibility'];
 }
 
 // Fetch Normalized Projects with Tags
@@ -151,7 +168,7 @@ $allTags = $tagStmt->fetchAll();
 
 $projectTags = [];
 foreach ($allTags as $t) {
-    $projectTags[$t['project_id']][] = $t['tag_name'];
+    $projectTags[(int)$t['project_id']][] = $t['tag_name'];
 }
 
 // Fetch Education
@@ -309,13 +326,16 @@ $remainingName = implode(' ', $nameParts);
                         </article>
                     <?php endforeach; ?>
                 </div>
-                <div class="learning-note reveal">
-                    <span class="learning-icon">↗</span>
-                    <div>
-                        <strong>Currently growing</strong>
-                        <p>Microsoft 365 Administration · Microsoft Entra ID · Azure Administrator (AZ-104 path)</p>
+
+                <?php if (!empty($profile['learning_text'])): ?>
+                    <div class="learning-note reveal">
+                        <span class="learning-icon">↗</span>
+                        <div>
+                            <strong><?= e($profile['learning_title'] ?: 'Currently growing') ?></strong>
+                            <p><?= e($profile['learning_text']) ?></p>
+                        </div>
                     </div>
-                </div>
+                <?php endif; ?>
             </div>
         </section>
 
@@ -343,12 +363,36 @@ $remainingName = implode(' ', $nameParts);
                                 </div>
                                 <ul>
                                     <?php
-                                    $bullets = $expResponsibilities[$job['id']] ?? [];
+                                    $bullets = $expResponsibilities[(int)$job['id']] ?? [];
                                     foreach ($bullets as $point):
                                     ?>
                                         <li><?= e((string)$point) ?></li>
                                     <?php endforeach; ?>
                                 </ul>
+
+                                <!-- Career Progression: Earlier Roles at this Same Company -->
+                                <?php if (!empty($childRoles[(int)$job['id']])): ?>
+                                    <div class="nested-promotions" style="margin-top: 1.5rem; padding-top: 1.25rem; border-top: 1px dashed rgba(255, 255, 255, 0.15);">
+                                        <div style="font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.08em; color: #38bdf8; margin-bottom: 0.9rem; font-weight: 600;">
+                                            Previous Role at <?= e($job['company']) ?>
+                                        </div>
+                                        <?php foreach ($childRoles[(int)$job['id']] as $subRole): ?>
+                                            <div class="promotion-subitem" style="margin-bottom: 1rem; padding-left: 0.85rem; border-left: 2px solid #0284c7;">
+                                                <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 0.35rem;">
+                                                    <h4 style="font-size: 1.05rem; margin: 0; color: #cbd5e1; font-weight: 600;">
+                                                        <?= e($subRole['role']) ?>
+                                                    </h4>
+                                                    <span style="font-size: 0.85rem; color: #94a3b8; font-family: monospace;"><?= e($subRole['period']) ?></span>
+                                                </div>
+                                                <ul style="margin-top: 0.35rem;">
+                                                    <?php foreach ($expResponsibilities[(int)$subRole['id']] ?? [] as $subPoint): ?>
+                                                        <li><?= e((string)$subPoint) ?></li>
+                                                    <?php endforeach; ?>
+                                                </ul>
+                                            </div>
+                                        <?php endforeach; ?>
+                                    </div>
+                                <?php endif; ?>
                             </div>
                         </article>
                     <?php endforeach; ?>
@@ -379,7 +423,7 @@ $remainingName = implode(' ', $nameParts);
                                 <p><?= e($project['description']) ?></p>
                                 <div class="tag-list">
                                     <?php
-                                    $tags = $projectTags[$project['id']] ?? [];
+                                    $tags = $projectTags[(int)$project['id']] ?? [];
                                     foreach ($tags as $tag):
                                     ?>
                                         <span><?= e((string)$tag) ?></span>
@@ -410,14 +454,17 @@ $remainingName = implode(' ', $nameParts);
                             </div>
                         </article>
                     <?php endforeach; ?>
-                    <div class="learning-card reveal">
-                        <div class="learning-icon">◎</div>
-                        <div>
-                            <p class="eyebrow">CONTINUOUS LEARNING</p>
-                            <h3>Building toward cloud &amp; enterprise infrastructure</h3>
-                            <p>Focused on Microsoft 365, Entra ID, Azure administration, and lab-based deployments.</p>
+
+                    <?php if (!empty($profile['learning_text'])): ?>
+                        <div class="learning-card reveal">
+                            <div class="learning-icon">◎</div>
+                            <div>
+                                <p class="eyebrow">CONTINUOUS LEARNING</p>
+                                <h3><?= e($profile['learning_title'] ?: 'Building toward cloud & enterprise infrastructure') ?></h3>
+                                <p><?= e($profile['learning_text']) ?></p>
+                            </div>
                         </div>
-                    </div>
+                    <?php endif; ?>
                 </div>
             </div>
         </section>

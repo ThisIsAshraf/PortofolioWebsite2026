@@ -35,9 +35,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         redirect('admin/login');
     }
 
-    // -------------------------------------------------------------------------
     // Profile & Photo Update
-    // -------------------------------------------------------------------------
     if ($action === 'save_profile') {
         $keys = ['name', 'role', 'location', 'headline', 'intro', 'linkedin', 'email', 'phone'];
         $values = [];
@@ -88,9 +86,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         redirect('admin/profile');
     }
 
-    // -------------------------------------------------------------------------
+    // Global Site Settings Handler
+    if ($action === 'save_site_settings') {
+        $keys = [
+            'headline',
+            'intro',
+            'learning_title',
+            'learning_text',
+            'edu_learning_title',
+            'edu_learning_text',
+            'availability_status',
+            'github'
+        ];
+
+        foreach ($keys as $key) {
+            set_setting($key, trim((string)($_POST[$key] ?? '')));
+        }
+
+        flash('success', 'Site settings updated successfully.');
+        redirect('admin/settings');
+    }
+
     // SMTP Configuration & Test Dispatch
-    // -------------------------------------------------------------------------
     if ($action === 'save_smtp') {
         save_smtp_config([
             'host'       => $_POST['host'] ?? '',
@@ -139,9 +156,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         redirect('admin/smtp');
     }
 
-    // -------------------------------------------------------------------------
     // Normalized Content CRUD Handlers
-    // -------------------------------------------------------------------------
     if ($action === 'save_content') {
         $type = (string)($_POST['type'] ?? '');
         $id = (int)($_POST['id'] ?? 0);
@@ -185,23 +200,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $period = trim((string)($_POST['period'] ?? ''));
             $location = trim((string)($_POST['location'] ?? ''));
             $sort = (int)($_POST['sort_order'] ?? 0);
+            $parentId = (!empty($_POST['parent_id']) && is_numeric($_POST['parent_id'])) ? (int)$_POST['parent_id'] : null;
             $rawBullets = trim((string)($_POST['description'] ?? ''));
 
-            if ($role === '' || $company === '' || $period === '') {
-                flash('error', 'Job title, company, and period are required.');
+            if ($role === '' || $period === '') {
+                flash('error', 'Job title and date range are required.');
+                redirect("admin/content/experience" . ($id ? "?edit={$id}" : '?new=1'));
+            }
+
+            // Inherit company and location if linked as an internal promotion
+            if ($parentId !== null) {
+                $pStmt = $pdo->prepare('SELECT company, location FROM experience WHERE id = ?');
+                $pStmt->execute([$parentId]);
+                if ($parentRow = $pStmt->fetch()) {
+                    if ($company === '') $company = $parentRow['company'];
+                    if ($location === '') $location = $parentRow['location'];
+                }
+            }
+
+            if ($company === '') {
+                flash('error', 'Company name is required for primary positions.');
                 redirect("admin/content/experience" . ($id ? "?edit={$id}" : '?new=1'));
             }
 
             $pdo->beginTransaction();
             if ($id > 0) {
-                $uStmt = $pdo->prepare('UPDATE experience SET role = ?, company = ?, period = ?, location = ?, sort_order = ? WHERE id = ?');
-                $uStmt->execute([$role, $company, $period, $location, $sort, $id]);
+                $uStmt = $pdo->prepare('UPDATE experience SET parent_id = ?, role = ?, company = ?, period = ?, location = ?, sort_order = ? WHERE id = ?');
+                $uStmt->execute([$parentId, $role, $company, $period, $location, $sort, $id]);
                 $pdo->prepare('DELETE FROM experience_responsibilities WHERE experience_id = ?')->execute([$id]);
                 $expId = $id;
                 flash('success', 'Work experience updated.');
             } else {
-                $iStmt = $pdo->prepare('INSERT INTO experience (role, company, period, location, sort_order) VALUES (?, ?, ?, ?, ?)');
-                $iStmt->execute([$role, $company, $period, $location, $sort]);
+                $iStmt = $pdo->prepare('INSERT INTO experience (parent_id, role, company, period, location, sort_order) VALUES (?, ?, ?, ?, ?, ?)');
+                $iStmt->execute([$parentId, $role, $company, $period, $location, $sort]);
                 $expId = (int)$pdo->lastInsertId();
                 flash('success', 'Work experience created.');
             }
@@ -348,6 +379,30 @@ if ($page === 'profile') {
     exit;
 }
 
+// Site Settings View
+if ($page === 'settings') {
+    $title = 'Site Settings';
+    $settingKeys = [
+        'headline',
+        'intro',
+        'learning_title',
+        'learning_text',
+        'edu_learning_title',
+        'edu_learning_text',
+        'availability_status',
+        'github'
+    ];
+    $settings = [];
+    foreach ($settingKeys as $k) {
+        $settings[$k] = setting($k);
+    }
+
+    require __DIR__ . '/views/header.php';
+    require __DIR__ . '/views/settings.php';
+    require __DIR__ . '/views/footer.php';
+    exit;
+}
+
 // Normalized Content CRUD View
 if ($page === 'content') {
     $type = (string)($_GET['type'] ?? 'skills');
@@ -362,6 +417,16 @@ if ($page === 'content') {
     $responsibilities = '';
     $tags = '';
     $rows = [];
+    $companies = [];
+
+    // Allow all roles to be selectable as parents in the dropdown
+    if ($type === 'experience') {
+        $companies = $pdo->query('
+            SELECT id, company, role 
+            FROM experience 
+            ORDER BY sort_order ASC, id ASC
+        ')->fetchAll();
+    }
 
     if ($isForm) {
         if ($id > 0) {
@@ -398,6 +463,13 @@ if ($page === 'content') {
     } else {
         if ($type === 'skills') {
             $rows = $pdo->query('SELECT s.*, g.name AS group_name FROM skills s JOIN skill_groups g ON s.group_id = g.id ORDER BY s.sort_order ASC, s.id ASC')->fetchAll();
+        } elseif ($type === 'experience') {
+            $rows = $pdo->query('
+                SELECT e.*, p.company AS parent_company 
+                FROM experience e 
+                LEFT JOIN experience p ON e.parent_id = p.id 
+                ORDER BY COALESCE(e.parent_id, e.id) ASC, e.parent_id ASC, e.sort_order ASC
+            ')->fetchAll();
         } else {
             $rows = $pdo->query("SELECT * FROM `{$type}` ORDER BY sort_order ASC, id ASC")->fetchAll();
         }
@@ -504,6 +576,7 @@ require __DIR__ . '/views/header.php';
     <div class="admin-panel quick-links">
         <h2>Quick Shortcuts</h2>
         <a href="<?= e(url('admin/profile')) ?>">◉ &nbsp; Update profile &amp; photo <span>↗</span></a>
+        <a href="<?= e(url('admin/settings')) ?>">🎛 &nbsp; Global site &amp; learning copy <span>↗</span></a>
         <a href="<?= e(url('admin/content/skills')) ?>">✳ &nbsp; Edit skills <span>↗</span></a>
         <a href="<?= e(url('admin/content/experience')) ?>">▤ &nbsp; Update work experience <span>↗</span></a>
         <a href="<?= e(url('admin/content/projects')) ?>">◇ &nbsp; Manage projects <span>↗</span></a>
