@@ -94,7 +94,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         redirect('admin/profile');
     }
 
-    // Global Site Settings & Section Headers Handler
+    // Global Site Settings, Section Headers & Dynamic Footer Handler
     if ($action === 'save_site_settings') {
         $keys = [
             'headline',
@@ -126,14 +126,45 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'learning_title',
             'learning_text',
             'edu_learning_title',
-            'edu_learning_text'
+            'edu_learning_text',
+            'footer_badge_letter',
+            'footer_brand_name',
+            'footer_tagline',
+            'footer_copyright',
+            'footer_show_back_to_top',
+            'footer_show_admin_link'
         ];
 
         foreach ($keys as $key) {
-            set_setting($key, trim((string)($_POST[$key] ?? '')));
+            if ($key === 'footer_show_back_to_top' || $key === 'footer_show_admin_link') {
+                set_setting($key, isset($_POST[$key]) ? '1' : '0');
+            } else {
+                set_setting($key, trim((string)($_POST[$key] ?? '')));
+            }
         }
 
-        flash('success', 'Site settings and section copy updated successfully.');
+        // Process Dynamic Add/Remove Footer Custom Links
+        $linkLabels = $_POST['footer_link_label'] ?? [];
+        $linkUrls   = $_POST['footer_link_url'] ?? [];
+        $linkNewTab = $_POST['footer_link_new_tab'] ?? [];
+        $footerLinks = [];
+
+        if (is_array($linkLabels) && is_array($linkUrls)) {
+            foreach ($linkLabels as $idx => $label) {
+                $lbl = trim((string)$label);
+                $url = trim((string)($linkUrls[$idx] ?? ''));
+                if ($lbl !== '' || $url !== '') {
+                    $footerLinks[] = [
+                        'label'   => $lbl,
+                        'url'     => $url,
+                        'new_tab' => !empty($linkNewTab[$idx]) ? '1' : '0'
+                    ];
+                }
+            }
+        }
+        set_setting('footer_links_json', json_encode($footerLinks, JSON_UNESCAPED_UNICODE));
+
+        flash('success', 'Site settings, section copy, and complete footer configuration saved.');
         redirect('admin/settings');
     }
 
@@ -173,8 +204,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 : \PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_STARTTLS;
             $mail->Port       = (int)$smtp['port'];
 
-            $mail->setFrom($smtp['from_email'] ?: $smtp['username'], (string)$smtp['from_name']);
+            $fromEmail = $smtp['from_email'] ?: $smtp['username'];
+            $fromName  = $smtp['from_name'] ?: setting('name', 'Portfolio Admin');
+            $mail->setFrom($fromEmail, (string)$fromName);
             $mail->addAddress($to);
+            $mail->addReplyTo($fromEmail, (string)$fromName);
+
+            $mail->isHTML(true);
             $mail->Subject = 'SMTP Test Verification — Portfolio CMS';
             $mail->Body    = "Success! Your SMTP mail configuration is functional and ready to deliver contact form notifications.";
 
@@ -591,12 +627,28 @@ if ($page === 'settings') {
         'learning_title',
         'learning_text',
         'edu_learning_title',
-        'edu_learning_text'
+        'edu_learning_text',
+        'footer_badge_letter',
+        'footer_brand_name',
+        'footer_tagline',
+        'footer_copyright',
+        'footer_show_back_to_top',
+        'footer_show_admin_link'
     ];
     $settings = [];
     foreach ($settingKeys as $k) {
         $settings[$k] = setting($k);
     }
+
+    $footerLinksJson = setting('footer_links_json', '');
+    $footerLinks = json_decode($footerLinksJson, true);
+    if (!is_array($footerLinks)) {
+        $footerLinks = [
+            ['label' => 'GitHub', 'url' => setting('github', 'https://github.com/ashraful98'), 'new_tab' => '1'],
+            ['label' => 'LinkedIn', 'url' => setting('linkedin', 'https://linkedin.com/in/ashraful98'), 'new_tab' => '1']
+        ];
+    }
+    $settings['footer_links'] = $footerLinks;
 
     require __DIR__ . '/views/header.php';
     require __DIR__ . '/views/settings.php';
@@ -801,7 +853,6 @@ if ($page === 'analytics') {
         $end = date('Y-m-d');
     }
 
-    // Precise Full-Day Timestamp Boundary (midnight to 23:59:59)
     $startTime = $start . ' 00:00:00';
     $endTime = $end . ' 23:59:59';
 
@@ -814,7 +865,7 @@ if ($page === 'analytics') {
     }
     $whereSql = implode(' AND ', $whereParts);
 
-    // CSV Exporter (Applies Active Filters)
+    // CSV Exporter
     if (isset($_GET['export']) && $_GET['export'] === 'csv') {
         header('Content-Type: text/csv; charset=utf-8');
         header('Content-Disposition: attachment; filename="portfolio_analytics_' . $start . '_to_' . $end . '.csv"');
@@ -832,7 +883,6 @@ if ($page === 'analytics') {
 
     $title = 'Site Analytics & Telemetry';
 
-    // Summary KPI Metrics
     $kpiViews = $pdo->prepare("SELECT COUNT(*) FROM visitor_logs WHERE {$whereSql}");
     $kpiViews->execute($bindings);
     $totalViews = (int)$kpiViews->fetchColumn();
@@ -848,7 +898,6 @@ if ($page === 'analytics') {
         'total_clicks'     => (int)$pdo->query('SELECT COUNT(*) FROM click_logs')->fetchColumn()
     ];
 
-    // Dynamic Daily Graph Aggregation
     $chartStmt = $pdo->prepare("
         SELECT 
             DATE(created_at) AS log_date,
@@ -865,7 +914,7 @@ if ($page === 'analytics') {
     $chartData = [];
     $curr = new DateTime($start);
     $stop = new DateTime($end);
-    $stop->modify('+1 day'); // Ensure end date inclusive
+    $stop->modify('+1 day');
 
     while ($curr < $stop) {
         $d = $curr->format('Y-m-d');
@@ -881,7 +930,6 @@ if ($page === 'analytics') {
         $curr->modify('+1 day');
     }
 
-    // Filtered Table Breakdowns
     $recentStmt = $pdo->prepare("SELECT * FROM visitor_logs WHERE {$whereSql} ORDER BY id DESC LIMIT 25");
     $recentStmt->execute($bindings);
     $recentLogs = $recentStmt->fetchAll();
@@ -963,6 +1011,7 @@ require __DIR__ . '/views/header.php';
         <h2>Quick Shortcuts</h2>
         <a href="<?= e(url('admin/profile')) ?>">◉ &nbsp; Update profile &amp; photo <span>↗</span></a>
         <a href="<?= e(url('admin/settings')) ?>">🎛 &nbsp; Global site &amp; section copy <span>↗</span></a>
+        <a href="<?= e(url('admin/cv')) ?>">📄 &nbsp; CV layouts &amp; engine <span>↗</span></a>
         <a href="<?= e(url('admin/content/skills')) ?>">✳ &nbsp; Edit skills <span>↗</span></a>
         <a href="<?= e(url('admin/content/experience')) ?>">▤ &nbsp; Update work experience <span>↗</span></a>
         <a href="<?= e(url('admin/content/projects')) ?>">◇ &nbsp; Manage projects <span>↗</span></a>

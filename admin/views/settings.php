@@ -4,6 +4,7 @@ declare(strict_types=1);
 /**
  * @var array $settings
  */
+$footerLinks = $settings['footer_links'] ?? [];
 ?>
 <div class="admin-panel">
     <h2>Global Site &amp; Section Settings</h2>
@@ -143,6 +144,120 @@ declare(strict_types=1);
             </label>
         </div>
 
-        <button class="button button-primary" type="submit" style="margin-top: 1.5rem;">Save All Settings ↗</button>
+        <!-- 9. Complete Website Footer Settings -->
+        <h3 style="margin: 2rem 0 0.5rem; font-size: 1.1rem; color: #0284c7;">07 / Website Footer Settings</h3>
+        <p class="panel-hint" style="margin-bottom: 1rem;">Customize every element of your public footer: brand initials badge, title, tagline, copyright, and custom navigation links.</p>
+
+        <div class="form-grid">
+            <label>Logo Monogram Letter
+                <input name="footer_badge_letter" value="<?= e($settings['footer_badge_letter'] ?? 'S.') ?>" placeholder="e.g. S.">
+                <small style="color: #64748b; font-size: 11px;">Displayed inside the lime badge block</small>
+            </label>
+
+            <label>Brand Name / Suffix
+                <input name="footer_brand_name" value="<?= e($settings['footer_brand_name'] ?? 'SHIHAB/') ?>" placeholder="e.g. SHIHAB/">
+                <small style="color: #64748b; font-size: 11px;">Bold logo title next to the badge</small>
+            </label>
+
+            <label class="wide">Tagline / Mission Statement
+                <input name="footer_tagline" value="<?= e($settings['footer_tagline'] ?? 'Designed with purpose. Built to keep systems moving.') ?>" placeholder="Tagline text">
+            </label>
+
+            <label class="wide">Copyright Notice
+                <input name="footer_copyright" value="<?= e($settings['footer_copyright'] ?? '© ' . date('Y') . ' Ashraful Alam Shihab') ?>">
+            </label>
+
+            <div class="wide" style="display: flex; gap: 24px; flex-wrap: wrap; margin-top: 8px;">
+                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                    <input type="checkbox" name="footer_show_back_to_top" value="1" <?= (!empty($settings['footer_show_back_to_top']) && $settings['footer_show_back_to_top'] === '1') ? 'checked' : '' ?> style="width: auto; margin: 0;">
+                    <span>Display "BACK TO TOP ↑" Button</span>
+                </label>
+
+                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                    <input type="checkbox" name="footer_show_admin_link" value="1" <?= (!empty($settings['footer_show_admin_link']) && $settings['footer_show_admin_link'] === '1') ? 'checked' : '' ?> style="width: auto; margin: 0;">
+                    <span>Display "Admin" Quick Access Link</span>
+                </label>
+            </div>
+        </div>
+
+        <!-- Dynamic Add/Remove Footer Custom Links -->
+        <div style="border-top: 1px solid #e2e8f0; padding-top: 20px; margin-top: 24px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <div>
+                    <h4 style="margin: 0; font-size: 14.5px; color: #0f172a; font-weight: 700;">Footer Navigation &amp; Social Links</h4>
+                    <p class="panel-hint" style="margin: 2px 0 0;">Add, remove, or modify links shown in your website footer.</p>
+                </div>
+                <button type="button" onclick="addFooterLinkRow()" style="background: #16a34a; color: #fff; border: none; padding: 7px 14px; border-radius: 6px; font-size: 11.5px; font-weight: 600; cursor: pointer;">
+                    + Add New Link
+                </button>
+            </div>
+
+            <div id="footerLinksContainer" style="display: flex; flex-direction: column; gap: 10px; margin-top: 12px;">
+                <?php foreach ($footerLinks as $idx => $link): ?>
+                    <div class="footer-link-row" style="display: grid; grid-template-columns: 200px 1fr 140px 40px; gap: 10px; align-items: center; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 14px;">
+                        <div>
+                            <span style="font-size: 10px; color: #64748b; font-weight: 600; display: block; margin-bottom: 4px;">Link Label</span>
+                            <input name="footer_link_label[]" value="<?= e($link['label'] ?? '') ?>" placeholder="e.g. GitHub" style="width: 100%; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12px; background: #fff;">
+                        </div>
+                        <div>
+                            <span style="font-size: 10px; color: #64748b; font-weight: 600; display: block; margin-bottom: 4px;">Destination URL</span>
+                            <input name="footer_link_url[]" value="<?= e($link['url'] ?? '') ?>" placeholder="https://..." style="width: 100%; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12px; background: #fff;">
+                        </div>
+                        <div style="padding-top: 16px;">
+                            <label style="display: flex; align-items: center; gap: 6px; font-size: 11px; color: #475569; margin: 0; cursor: pointer;">
+                                <input type="checkbox" name="footer_link_new_tab[<?= $idx ?>]" value="1" <?= (!empty($link['new_tab']) && $link['new_tab'] === '1') ? 'checked' : '' ?> style="width: auto; margin: 0;">
+                                New Tab ↗
+                            </label>
+                        </div>
+                        <div style="padding-top: 14px;">
+                            <button type="button" onclick="removeFooterLinkRow(this)" title="Delete Link" style="background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; width: 34px; height: 34px; border-radius: 6px; cursor: pointer; display: grid; place-content: center; font-size: 14px;">
+                                🗑
+                            </button>
+                        </div>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+        </div>
+
+        <button class="button button-primary" type="submit" style="margin-top: 2rem;">Save All Settings ↗</button>
     </form>
 </div>
+
+<script>
+    function addFooterLinkRow() {
+        const container = document.getElementById('footerLinksContainer');
+        const newIdx = container.querySelectorAll('.footer-link-row').length;
+        const newDiv = document.createElement('div');
+        newDiv.className = 'footer-link-row';
+        newDiv.style = 'display: grid; grid-template-columns: 200px 1fr 140px 40px; gap: 10px; align-items: center; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 14px;';
+        newDiv.innerHTML = `
+        <div>
+            <span style="font-size: 10px; color: #64748b; font-weight: 600; display: block; margin-bottom: 4px;">Link Label</span>
+            <input name="footer_link_label[]" placeholder="e.g. LinkedIn" style="width: 100%; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12px; background: #fff;">
+        </div>
+        <div>
+            <span style="font-size: 10px; color: #64748b; font-weight: 600; display: block; margin-bottom: 4px;">Destination URL</span>
+            <input name="footer_link_url[]" placeholder="https://..." style="width: 100%; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12px; background: #fff;">
+        </div>
+        <div style="padding-top: 16px;">
+            <label style="display: flex; align-items: center; gap: 6px; font-size: 11px; color: #475569; margin: 0; cursor: pointer;">
+                <input type="checkbox" name="footer_link_new_tab[${newIdx}]" value="1" checked style="width: auto; margin: 0;">
+                New Tab ↗
+            </label>
+        </div>
+        <div style="padding-top: 14px;">
+            <button type="button" onclick="removeFooterLinkRow(this)" title="Delete Link" style="background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; width: 34px; height: 34px; border-radius: 6px; cursor: pointer; display: grid; place-content: center; font-size: 14px;">
+                🗑
+            </button>
+        </div>
+    `;
+        container.appendChild(newDiv);
+    }
+
+    function removeFooterLinkRow(btn) {
+        const row = btn.closest('.footer-link-row');
+        if (row) {
+            row.remove();
+        }
+    }
+</script>
