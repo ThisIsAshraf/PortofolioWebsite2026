@@ -1,34 +1,26 @@
 # 1. Prevent Directory Browsing
 Options -Indexes
 
-# 2. Block direct access to sensitive system files & configurations
-<FilesMatch "^(\.env|\.git|composer\.(json|lock)|config\.php|README\.md|tree\.php|setup\.php|\.htaccess)$">
-    <IfModule mod_authz_core.c>
-        Require all denied
-    </IfModule>
-    <IfModule !mod_authz_core.c>
-        Order allow,deny
-        Deny from all
-    </IfModule>
-</FilesMatch>
-
-# 3. Block access to hidden directories (.git, .vscode, etc.)
-RedirectMatch 404 /\..*
-
-# 4. Security Headers to protect visitors (Helps prevent Safe Browsing warnings)
-<IfModule mod_headers.c>
-    Header set X-Content-Type-Options "nosniff"
-    Header set X-Frame-Options "SAMEORIGIN"
-    Header set X-XSS-Protection "1; mode=block"
-    Header set Referrer-Policy "strict-origin-when-cross-origin"
-</IfModule>
-
-# 5. Friendly URLs & Route Handling
+# 2. Block direct browser access to sensitive system files & configurations
 <IfModule mod_rewrite.c>
     RewriteEngine On
-    
-    # Do not rewrite if file or directory physically exists
+
+    # Prevent infinite loop when serving the custom error page itself
+    RewriteRule ^403\.php$ - [L]
+
+    # Intercept direct access to sensitive system files and route directly to 403.php
+    RewriteRule ^(\.env|\.git|composer\.(json|lock)|config\.php|README\.md|tree\.php|setup\.php|\.htaccess)$ 403.php [L]
+
+    # Block direct browser access to internal include folders
+    RewriteRule ^(views|vendor|includes)/.*$ 403.php [L]
+
+    # Block access to hidden dot-files (.git, .vscode, etc.)
+    RewriteRule (^\.|/\.) - [F,L]
+
+    # Standard clean routing for public portfolio
     RewriteCond %{REQUEST_FILENAME} -f [OR]
     RewriteCond %{REQUEST_FILENAME} -d
     RewriteRule ^ - [L]
+
+    RewriteRule ^ index.php [L,QSA]
 </IfModule>

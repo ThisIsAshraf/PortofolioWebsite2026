@@ -133,7 +133,7 @@ function verify_csrf(): void
     }
 }
 
-// 8. Session Flash Messages
+// 8. Session Flash Messages & Enterprise Access Control
 function flash(string $type, string $message): void
 {
     $_SESSION['flash'][] = ['type' => $type, 'message' => $message];
@@ -149,8 +149,11 @@ function take_flashes(): array
 function require_admin(): void
 {
     if (empty($_SESSION['admin_id'])) {
-        flash('error', 'Please sign in to access the admin dashboard.');
-        redirect('admin/login.php');
+        if (!empty($_SERVER['REQUEST_URI'])) {
+            $_SESSION['redirect_after_login'] = $_SERVER['REQUEST_URI'];
+        }
+        flash('error', 'Access Restricted: Please sign in with administrator credentials.');
+        redirect('admin/login');
     }
 }
 
@@ -313,11 +316,6 @@ function save_smtp_config(array $data): void
 // 12. Visitor Tracking Engine
 function record_visit(): void
 {
-    // Skip recording admin sessions or AJAX calls to avoid polluters
-    // if (!empty($_SESSION['admin_id'])) {
-    //  return;
-    //}
-
     $isAjax = (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest')
         || (isset($_SERVER['HTTP_ACCEPT']) && str_contains($_SERVER['HTTP_ACCEPT'], 'application/json'));
     if ($isAjax) {

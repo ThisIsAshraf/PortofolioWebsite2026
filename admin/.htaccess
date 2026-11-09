@@ -1,16 +1,22 @@
 Options -Indexes
 RewriteEngine On
 
-# 1. Direct login route
+# 0. Override Apache's default 403 error page with custom branded page
+ErrorDocument 403 /403.php
+
+# 1. Block direct browser requests to internal templates and private includes
+RewriteRule ^views(/.*)?$ - [F,L]
+
+# 2. Direct login route
 RewriteRule ^login/?$ login.php [L,QSA]
 
-# 2. Logout route
+# 3. Logout route
 RewriteRule ^logout/?$ index.php?action=logout [L,QSA]
 
-# 3. Content sub-routes: /admin/content/skills -> index.php?page=content&type=skills
+# 4. Content sub-routes: /admin/content/skills -> index.php?page=content&type=skills
 RewriteRule ^content/([a-zA-Z0-9_-]+)/?$ index.php?page=content&type=$1 [L,QSA]
 
-# 4. Standard admin page routes: /admin/profile, /admin/messages
+# 5. Standard admin page routes: /admin/profile, /admin/messages
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
 RewriteRule ^([a-zA-Z0-9_-]+)/?$ index.php?page=$1 [L,QSA]
